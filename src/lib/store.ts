@@ -34,6 +34,14 @@ export interface Pick {
   homeScore: number | null
   manual: 'W' | 'L' | 'P' | null
   updatedAt: number
+  // Set when the pick was made from the live ESPN slate
+  eventId?: string | null
+  kickoff?: string | null
+  awayAbbr?: string
+  homeAbbr?: string
+  awayLogo?: string | null
+  homeLogo?: string | null
+  live?: { state: 'pre' | 'in' | 'post'; detail: string; away: number | null; home: number | null } | null
 }
 
 const K_SETTINGS = 'grind:settings'
@@ -76,6 +84,39 @@ export async function getState(): Promise<{ version: number; settings: Settings;
   return { version: Number(version ?? 0), settings: settings ?? DEFAULT_SETTINGS, picks: picks ?? {} }
 }
 
+export async function getSettings(): Promise<Settings> {
+  if (!useKV()) return mem.settings ?? DEFAULT_SETTINGS
+  return (await kv.get<Settings>(K_SETTINGS)) ?? DEFAULT_SETTINGS
+}
+
+export async function getPick(id: string): Promise<Pick | null> {
+  if (!useKV()) return mem.picks.get(id) ?? null
+  return (await kv.hget<Pick>(K_PICKS, id)) ?? null
+}
+
+export async function getAllPicks(): Promise<Record<string, Pick>> {
+  if (!useKV()) return Object.fromEntries(mem.picks)
+  return (await kv.hgetall<Record<string, Pick>>(K_PICKS)) ?? {}
+}
+
+/** Write several picks with one version bump (used by auto-grading). */
+export async function putPicks(picks: Record<string, Pick>): Promise<number> {
+  if (!Object.keys(picks).length) return getVersion()
+  if (!useKV()) for (const [id, p] of Object.entries(picks)) mem.picks.set(id, p)
+  else await kv.hset(K_PICKS, picks)
+  return bump()
+}
+
+let memSettleAt = 0
+/** True at most once per `sec` seconds across all requests (SET NX with expiry). */
+export async function claimSettle(sec: number): Promise<boolean> {
+  if (!useKV()) {
+    if (Date.now() - memSettleAt < sec * 1000) return false
+    memSettleAt = Date.now(); return true
+  }
+  return (await kv.set('grind:settle-lock', Date.now(), { nx: true, ex: sec })) === 'OK'
+}
+
 export async function putPick(id: string, pick: Pick): Promise<number> {
   if (!useKV()) mem.picks.set(id, pick)
   else await kv.hset(K_PICKS, { [id]: pick })
@@ -96,7 +137,7 @@ export async function putSettings(settings: Settings): Promise<number> {
 
 /* ---------- validation (the site has no sign-in, so the server checks shape) ---------- */
 
-const PICK_ID = /^d([0-4][0-9])-p([0-9])$/
+export const PICK_ID = /^d([0-4][0-9])-p([0-9])$/
 const clean = (s: unknown, max = 40) => String(s ?? '').trim().slice(0, max)
 const numOrNull = (v: unknown) => (v === null || v === undefined || v === '' || isNaN(Number(v)) ? null : Number(v))
 

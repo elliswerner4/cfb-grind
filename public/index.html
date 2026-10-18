@@ -238,6 +238,51 @@ img{max-width:100%}
 [hidden]{display:none!important}
 .board .in{padding-top:calc(20px + env(safe-area-inset-top,0px))!important}
 .wrap{padding-bottom:calc(56px + env(safe-area-inset-bottom,0px))!important}
+
+/* ---------- slate picker ---------- */
+.sheet-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.sheet-top .lead{margin-top:6px}
+.xbtn{border:0;background:var(--sunk);width:34px;height:34px;border-radius:50%;font-size:14px;flex:none;color:var(--muted)}
+.pane{display:flex;flex-direction:column;gap:12px}
+.search{border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:11px 12px;width:100%;font-size:15px}
+.slate{display:flex;flex-direction:column;gap:6px;max-height:52vh;overflow-y:auto;margin:0 -4px;padding:0 4px}
+.slate .msg{color:var(--muted);text-align:center;padding:24px 8px;font-size:14px}
+.gm{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 10px;align-items:center;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:10px 12px}
+.gm:hover:not(:disabled){border-color:var(--ink)}
+.gm:disabled{opacity:.6;cursor:not-allowed;background:var(--sunk)}
+.gm .gm-time{grid-column:1/-1;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;display:flex;gap:8px;align-items:center}
+.gm .gm-team{display:flex;align-items:center;gap:8px;min-width:0;font-weight:500}
+.gm .gm-team b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gm .gm-val{font-family:var(--mono);font-size:13.5px;text-align:right;color:var(--ink)}
+.gm .gm-ou{grid-column:1/-1;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.logo{width:22px;height:22px;object-fit:contain;flex:none}
+.logo.sm{width:18px;height:18px}
+.logo.lg{width:40px;height:40px}
+.rk{font-family:var(--mono);font-size:11px;color:var(--muted);font-weight:600}
+.livedot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--loss)}
+@media (prefers-reduced-motion:no-preference){.livedot{animation:blink 1.4s ease-in-out infinite}@keyframes blink{50%{opacity:.25}}}
+.matchup{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--sunk);border-radius:12px;padding:12px 14px}
+.matchup .side{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;min-width:0;text-align:center}
+.matchup .side b{font-family:var(--display);font-weight:800;font-size:20px;text-transform:uppercase;line-height:1;overflow-wrap:anywhere}
+.matchup .mid{font-size:12px;color:var(--muted);text-align:center;flex:none}
+.bets{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.bet{border:1.5px solid var(--line);background:var(--surface);border-radius:12px;padding:12px 10px;display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;min-width:0}
+.bet small{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.bet b{font-family:var(--display);font-weight:900;font-size:24px;text-transform:uppercase;line-height:1;overflow-wrap:anywhere}
+.bet:disabled{opacity:.4;cursor:not-allowed}
+.bet[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);box-shadow:0 0 0 2px var(--accent-soft)}
+.linkish{border:0;background:none;padding:2px 0;color:var(--muted);font-size:13.5px;text-decoration:underline;text-underline-offset:3px;align-self:flex-start}
+.locked{background:var(--sunk);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:6px}
+.locked .pick{font-size:30px}
+.chip.live{background:var(--loss-soft);color:var(--loss)}
+.livebox{display:flex;flex-direction:column;gap:6px;background:var(--sunk);border-radius:10px;padding:9px 10px}
+.livebox .lb-top{display:flex;justify-content:space-between;gap:8px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.livebox .lb-row{display:flex;align-items:center;gap:8px;font-size:14px}
+.livebox .lb-row b{font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.livebox .lb-row .num{font-weight:600;font-size:16px}
+.cover{font-size:12px;font-weight:600}
+.cover.y{color:var(--win)} .cover.n{color:var(--loss)} .cover.p{color:var(--push)}
+.matchline{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);min-width:0;flex-wrap:wrap}
 </style>
 </head>
 <body>
@@ -299,10 +344,31 @@ img{max-width:100%}
 <!-- Pick sheet -->
 <div class="scrim" id="pickScrim" hidden>
   <form class="sheet" id="pickForm" novalidate>
-    <h3 id="pfTitle">Make your pick</h3>
-    <div class="lead" id="pfLead"></div>
+    <div class="sheet-top">
+      <div><h3 id="pfTitle">Make your pick</h3><div class="lead" id="pfLead"></div></div>
+      <button type="button" class="xbtn" id="pfX" aria-label="Close">&#x2715;</button>
+    </div>
     <label class="field" id="pfPlayerWrap"><span>Player</span><select id="pfPlayer"></select></label>
-    <div class="at">
+
+    <div id="paneSlate" class="pane">
+      <input id="slateQ" class="search" type="search" placeholder="Search a team" autocomplete="off" aria-label="Search games">
+      <div id="slateList" class="slate" aria-live="polite"></div>
+      <button type="button" class="linkish" id="toManual">Game not listed? Enter it by hand</button>
+    </div>
+
+    <div id="paneBet" class="pane" hidden>
+      <button type="button" class="linkish" id="toSlate">&larr; All games</button>
+      <div id="betGame"></div>
+      <div class="bets" id="bets"></div>
+      <div class="hint">The line locks in when you save. Picks lock at kickoff and grade themselves when the game goes final.</div>
+    </div>
+
+    <div id="paneLocked" class="pane" hidden></div>
+
+    <div id="paneManual" class="pane" hidden>
+      <button type="button" class="linkish" id="manualBack">&larr; Back to the slate</button>
+      <div class="hint">Hand-entered picks don't auto-grade. Add the final score yourself after the game.</div>
+      <div class="at">
       <label class="field"><span>Away</span><input id="pfAway" list="teams" autocomplete="off" placeholder="Clemson"></label>
       <span class="atsym">@</span>
       <label class="field"><span>Home</span><input id="pfHome" list="teams" autocomplete="off" placeholder="Virginia"></label>
@@ -328,8 +394,10 @@ img{max-width:100%}
         </label>
       </div>
     </details>
+    </div>
+
     <div class="err" id="pfErr" hidden></div>
-    <div class="sheet-acts">
+    <div class="sheet-acts" id="pfActs">
       <button type="button" class="btn danger small" id="pfDel" hidden>Delete</button>
       <span class="spacer"></span>
       <button type="button" class="btn" id="pfCancel">Cancel</button>
@@ -438,6 +506,30 @@ function playerStats(slot){
 function dayResults(d){ return S.players.map((_,s)=>result(getPick(d,s))); }
 const isPerfect = d => { const r=dayResults(d); return r.every(x=>x==="W"); };
 
+
+/* live score box for slate picks */
+function liveState(p){
+  if(!p) return null;
+  if(num(p.awayScore)!==null && num(p.homeScore)!==null) return "post";
+  return p.live?.state || (p.eventId ? "pre" : null);
+}
+function coverText(p){
+  const l=p.live; if(!l || l.away===null || l.home===null) return "";
+  const r=grade({...p, awayScore:l.away, homeScore:l.home});
+  if(!r) return "";
+  const t = p.type==="total" ? {W:"Hitting",L:"Not hitting",P:"On the number"}[r] : {W:"Covering",L:"Not covering",P:"On the number"}[r];
+  return `<span class="cover ${r==="W"?"y":r==="L"?"n":"p"}">${t}</span>`;
+}
+function liveBox(p){
+  if(!p?.eventId) return "";
+  const st=liveState(p);
+  const a = st==="post" ? p.awayScore : p.live?.away, h = st==="post" ? p.homeScore : p.live?.home;
+  if(st==="pre" || a==null || h==null) return "";
+  const top = st==="in" ? `<span><span class="livedot"></span> Live · ${esc(p.live?.detail||"")}</span>${coverText(p)}` : `<span>Final</span>`;
+  return `<div class="livebox"><div class="lb-top">${top}</div>
+    <div class="lb-row">${logo(p.awayLogo,"sm")}<b>${esc(p.away)}</b><span class="num">${a}</span></div>
+    <div class="lb-row">${logo(p.homeLogo,"sm")}<b>${esc(p.home)}</b><span class="num">${h}</span></div></div>`;
+}
 /* ---------- renderers ---------- */
 let ST = [];
 function renderHeader(){
@@ -476,7 +568,14 @@ function renderHero(){
   const roll = `<div class="who-in">${S.players.map((_,s)=>avatar(s, getPick(t,s)?"":"ghosted")).join("")}<span>${off?"No-games day":inSlots.length===S.players.length?"Everyone's in":`${inSlots.length} of ${S.players.length} in · waiting on ${waiting.map(s=>esc(S.players[s])).join(", ")}`}</span></div>`;
   let k=`Day ${t+1} · ${esc(fmtLong(dayDate(t)))}`, big, sub, btn="", need=false;
   if(off){ big="Day off"; sub="Marked as a no-games day. Nothing to pick."; }
-  else if(!p){ need=true; big="Your pick's not in"; sub="Spread or total, any game on today's slate."; btn=`<button class="btn gold" data-edit="${slot}" data-day="${t}" ${canWrite&&db?"":"disabled"}>Make today's pick</button>`; }
+  else if(!p){ need=true; big="Your pick's not in"; sub="Pick from today's slate. Lines fill in live and lock at kickoff."; btn=`<button class="btn gold" data-edit="${slot}" data-day="${t}" ${canWrite&&db?"":"disabled"}>Make today's pick</button>`; }
+  else if(!r && p.eventId){
+    big=esc(pickLabel(p));
+    const ls=liveState(p);
+    sub = ls==="in" ? `<span class="livedot"></span> Live · ${esc(p.away)} ${p.live?.away??0} – ${esc(p.home)} ${p.live?.home??0} · ${esc(p.live?.detail||"")} ${coverText(p)}`
+        : kicked(p) ? `${esc(p.away)} @ ${esc(p.home)} · grading when it goes final` : `${esc(p.away)} @ ${esc(p.home)} · kicks off ${esc(fmtTime(p.kickoff))}`;
+    btn = kicked(p) ? (ls==="in"?`<span class="chip live"><span class="livedot"></span>Live</span>`:"") : `<button class="btn" data-edit="${slot}" data-day="${t}" ${canWrite&&db?"":"disabled"}>Change pick</button>`;
+  }
   else if(!r){ big=esc(pickLabel(p)); sub=`${esc(p.away)} @ ${esc(p.home)} · pending`; btn=`<button class="btn" data-edit="${slot}" data-day="${t}" ${canWrite&&db?"":"disabled"}>Enter final score</button>`; }
   else { big=esc(pickLabel(p)); sub=`${esc(p.away)} ${p.awayScore??""} – ${esc(p.home)} ${p.homeScore??""} · ${r==="W"?"Cashed":r==="L"?"Didn't hit":"Push"}`; btn=`<span class="chip ${r}">${RES[r]}</span>`; }
   h.hidden=false;
@@ -562,17 +661,22 @@ function renderDay(){
       const name=S.players[s], p=picks[s], r=result(p);
       let chip, inner, tags="";
       if(p){
-        chip = r ? `<span class="chip ${r}">${RES[r]}</span>` : `<span class="chip pend">Pending</span>`;
-        const sc = (num(p.awayScore)!==null&&num(p.homeScore)!==null) ? `<div class="score">${esc(p.away)} ${p.awayScore} · ${esc(p.home)} ${p.homeScore}</div>` : "";
+        const ls=liveState(p);
+        chip = r ? `<span class="chip ${r}">${RES[r]}</span>` : ls==="in" ? `<span class="chip live"><span class="livedot"></span>Live</span>` : `<span class="chip pend">${kicked(p)?"Pending":"Locked in"}</span>`;
+        const sc = p.eventId ? liveBox(p) : (num(p.awayScore)!==null&&num(p.homeScore)!==null) ? `<div class="score">${esc(p.away)} ${p.awayScore} · ${esc(p.home)} ${p.homeScore}</div>` : "";
         const tl = picks.map((q,o)=>{ if(o===s||!q||q.type!==p.type||gameKey(q)!==gameKey(p)) return ""; return q.side===p.side ? `<span class="tag tail">Same as ${esc(S.players[o])}</span>` : `<span class="tag fade">Fading ${esc(S.players[o])}</span>`; }).join("");
         tags = tl ? `<div class="tags">${tl}</div>` : "";
-        inner=`<div class="pick">${esc(pickLabel(p))}</div><div class="game">${esc(p.away)} @ ${esc(p.home)} · ${p.type==="total"?"total":"spread"}</div>${sc}${tags}`;
+        const gl = p.eventId
+          ? `<div class="matchline">${logo(p.awayLogo,"sm")}${esc(p.away)} @ ${logo(p.homeLogo,"sm")}${esc(p.home)}${ls==="pre"&&p.kickoff?` · ${esc(fmtTime(p.kickoff))}`:""}</div>`
+          : `<div class="game">${esc(p.away)} @ ${esc(p.home)} · ${p.type==="total"?"total":"spread"} · entered by hand</div>`;
+        inner=`<div class="pick">${esc(pickLabel(p))}</div>${gl}${sc}${tags}`;
       } else {
         chip = d<t ? `<span class="chip miss">Missed</span>` : `<span class="chip none">No pick</span>`;
         inner = `<div class="empty">${d<t?"Nothing entered for this day.":d===t?"On the clock.":"Picks open any time."}</div>`;
       }
       const act = p
-        ? `<button class="btn small" data-edit="${s}" ${allow?"":"disabled"}>${r?"Edit":"Enter final"}</button>`
+        ? (kicked(p) ? `<button class="btn small" data-edit="${s}">View</button>`
+           : `<button class="btn small" data-edit="${s}" ${allow?"":"disabled"}>${p.eventId?"Change pick":r?"Edit":"Enter final"}</button>`)
         : `<button class="btn small ${String(s)===me?"gold":"primary"}" data-edit="${s}" ${allow?"":"disabled"}>Make pick</button>`;
       return `<article class="card ${String(s)===me?"me":""} ${r||""}"><div class="top"><span class="who">${avatar(s)}<span>${esc(name)}</span></span>${chip}</div>${inner}<div class="acts">${act}</div></article>`;
     }).join("")}</div>`;
@@ -614,30 +718,130 @@ function renderAll(scroll){
 
 /* ---------- pick sheet ---------- */
 let form=null;
+const slates={};               // day -> {at, games, err}
+const kicked = p => !!(p && p.eventId && p.kickoff && Date.parse(p.kickoff) <= Date.now());
+const fmtTime = iso => new Date(iso).toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
+const logo = (src, cls="") => src ? `<img class="logo ${cls}" src="${esc(src)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">` : `<span class="logo ${cls}"></span>`;
+const rk = r => r ? `<span class="rk">${r}</span>` : "";
+
+function showPane(name){
+  form.pane=name;
+  ["Slate","Bet","Locked","Manual"].forEach(n=>$("pane"+n).hidden = n.toLowerCase()!==name);
+  const locked = name==="locked";
+  $("pfSave").hidden = locked || name==="slate";
+  $("pfDel").hidden = locked || !form.editing;
+  $("pfCancel").textContent = locked ? "Close" : "Cancel";
+  $("pfErr").hidden=true;
+  if(name==="manual") syncForm();
+  if(name==="bet") renderBet();
+  if(name==="slate") renderSlate();
+}
+
+async function loadSlate(day, force){
+  const c=slates[day];
+  if(c && !c.err && !force && Date.now()-c.at<60000) return c;
+  slates[day]={at:Date.now(), games:c?.games||null, loading:true};
+  if(form?.pane==="slate") renderSlate();
+  try{
+    const j=await api("GET","/api/games?day="+day);
+    slates[day]={at:Date.now(), games:j.games};
+  }catch(e){
+    slates[day]={at:Date.now(), games:c?.games||null, err:e.message||"Couldn't load the games"};
+  }
+  if(form?.pane==="slate") renderSlate();
+  return slates[day];
+}
+
+function gameRank(g){ return g.state==="pre"?0:g.state==="in"?1:2; }
+function renderSlate(){
+  if(!form) return;
+  const c=slates[form.day], el=$("slateList");
+  if(!c || (c.loading && !c.games)){ el.innerHTML=`<div class="msg">Loading the slate…</div>`; return; }
+  if(c.err && !c.games){ el.innerHTML=`<div class="msg">${esc(c.err)}<br><br><button type="button" class="btn small" id="slateRetry">Try again</button></div>`; return; }
+  const q=$("slateQ").value.trim().toLowerCase();
+  const games=(c.games||[]).filter(g=>!q || [g.away.name,g.away.full,g.away.abbr,g.home.name,g.home.full,g.home.abbr].some(x=>(x||"").toLowerCase().includes(q)))
+    .sort((x,y)=>gameRank(x)-gameRank(y) || x.start.localeCompare(y.start));
+  if(!c.games.length){ el.innerHTML=`<div class="msg">No FBS games on ${esc(fmtLong(dayDate(form.day)))}.<br>Close this and tap "No games this day" so it doesn't count.</div>`; return; }
+  if(!games.length){ el.innerHTML=`<div class="msg">No games match "${esc(q)}".</div>`; return; }
+  el.innerHTML=games.map(g=>{
+    const started = g.state!=="pre" || Date.parse(g.start)<=Date.now();
+    const time = g.state==="in" ? `<span class="livedot"></span>Live · ${esc(g.detail)}` : g.state==="post" ? `Final` : `${esc(fmtTime(g.start))}${started?" · Locked":""}`;
+    const val = (t,line) => started ? (t.score ?? "") : (line===null ? "—" : fmtLine(line));
+    return `<button type="button" class="gm" data-gid="${esc(g.id)}" ${started?"disabled":""}>
+      <span class="gm-time">${time}</span>
+      <span class="gm-team">${logo(g.away.logo)}${rk(g.away.rank)}<b>${esc(g.away.name)}</b></span><span class="gm-val">${val(g.away,g.spreadAway)}</span>
+      <span class="gm-team">${logo(g.home.logo)}${rk(g.home.rank)}<b>${esc(g.home.name)}</b></span><span class="gm-val">${val(g.home,g.spreadHome)}</span>
+      ${started?"":`<span class="gm-ou">O/U ${g.total===null?"—":g.total}</span>`}
+    </button>`;
+  }).join("");
+}
+
+function renderBet(){
+  const g=form.game; if(!g) return;
+  $("betGame").innerHTML=`<div class="matchup">
+    <div class="side">${logo(g.away.logo,"lg")}<b>${rk(g.away.rank)} ${esc(g.away.name)}</b></div>
+    <div class="mid">${esc(fmtTime(g.start))}<br>@</div>
+    <div class="side">${logo(g.home.logo,"lg")}<b>${rk(g.home.rank)} ${esc(g.home.name)}</b></div></div>`;
+  const opts=[
+    {type:"spread",side:"away",k:"Spread",lbl:`${g.away.abbr||g.away.name} ${g.spreadAway===null?"":fmtLine(g.spreadAway)}`,ok:g.spreadAway!==null},
+    {type:"spread",side:"home",k:"Spread",lbl:`${g.home.abbr||g.home.name} ${g.spreadHome===null?"":fmtLine(g.spreadHome)}`,ok:g.spreadHome!==null},
+    {type:"total",side:"over",k:"Total",lbl:`Over ${g.total??""}`,ok:g.total!==null},
+    {type:"total",side:"under",k:"Total",lbl:`Under ${g.total??""}`,ok:g.total!==null},
+  ];
+  $("bets").innerHTML=opts.map(o=>`<button type="button" class="bet" data-type="${o.type}" data-side="${o.side}" aria-pressed="${form.bet&&form.bet.type===o.type&&form.bet.side===o.side}" ${o.ok?"":"disabled"}><small>${o.ok?o.k:"No line yet"}</small><b>${esc(o.lbl)}</b></button>`).join("");
+  $("pfSave").disabled=!form.bet;
+}
+
+function renderLocked(p){
+  const r=result(p);
+  $("paneLocked").innerHTML=`<div class="locked">
+    <div class="k" style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600">Locked at kickoff</div>
+    <div class="pick">${esc(pickLabel(p))}</div>
+    <div class="matchline">${logo(p.awayLogo,"sm")}${esc(p.away)} @ ${logo(p.homeLogo,"sm")}${esc(p.home)}</div>
+    ${liveBox(p)}
+    <div class="hint">${r?`Graded automatically: ${RES[r]}.`:"This grades itself when the game goes final."}</div>
+  </div>`;
+}
+
 function openPick(day, slot){
   const p=getPick(day,slot);
-  form={ day, slot, editing:!!p, type:p?.type||"spread", side:p?.side||null, prevResult:result(p) };
-  $("pfTitle").textContent = p ? (result(p)?"Edit pick":"Grade or edit") : (String(slot)===me?"Make your pick":`Pick for ${S.players[slot]}`);
+  form={ day, slot, editing:!!p, type:p?.type||"spread", side:p?.side||null, prevResult:result(p), game:null, bet:null, pane:null };
+  $("pfTitle").textContent = p ? "Your pick" : (String(slot)===me?"Make your pick":`Pick for ${S.players[slot]}`);
+  if(p && String(slot)!==me) $("pfTitle").textContent = `${S.players[slot]}'s pick`;
   $("pfLead").textContent = `Day ${day+1} · ${fmtLong(dayDate(day))}`;
   $("pfPlayer").innerHTML = S.players.map((nm,i)=>`<option value="${i}" ${i===slot?"selected":""}>${esc(nm)}</option>`).join("");
   $("pfPlayerWrap").hidden = !!p || String(slot)===me;
+  $("slateQ").value="";
+  // manual fields
   $("pfAway").value=p?.away||""; $("pfHome").value=p?.home||"";
   $("pfLine").value=p?.line ?? "";
   $("pfAwayS").value=p?.awayScore ?? ""; $("pfHomeS").value=p?.homeScore ?? "";
   $("pfManual").value=p?.manual || "";
   $("pfFinal").open = !!p;
-  $("pfDel").hidden=!p; delete $("pfDel").dataset.armed; $("pfDel").textContent="Delete";
-  $("pfSave").textContent = p ? "Save" : "Lock it in";
-  $("pfErr").hidden=true;
-  syncForm();
+  delete $("pfDel").dataset.armed; $("pfDel").textContent="Delete";
+  $("pfSave").textContent = p ? "Save changes" : "Lock it in";
+  $("pfSave").disabled=false;
   $("pickScrim").hidden=false;
-  setTimeout(()=>{ (p? $("pfAwayS") : $("pfAway")).focus({preventScroll:true}); },60);
+
+  if(p && kicked(p)){ renderLocked(p); showPane("locked"); return; }
+  if(p && !p.eventId){ showPane("manual"); return; }
+  if(p && p.eventId){
+    form.bet={type:p.type, side:p.side};
+    showPane("slate");
+    loadSlate(day).then(c=>{ const g=(c.games||[]).find(x=>x.id===p.eventId); if(g && form){ form.game=g; showPane("bet"); } });
+    return;
+  }
+  showPane("slate");
+  loadSlate(day);
+  setTimeout(()=>$("slateQ").focus({preventScroll:true}),80);
 }
+
 function draft(){
   return { type:form.type, side:form.side, away:$("pfAway").value.trim()||"Away", home:$("pfHome").value.trim()||"Home",
     line:$("pfLine").value, awayScore:$("pfAwayS").value, homeScore:$("pfHomeS").value, manual:$("pfManual").value||null };
 }
 function syncForm(){
+  if(!form) return;
   const dr=draft();
   [...$("pfType").children].forEach(b=>b.setAttribute("aria-pressed", String(b.dataset.v===form.type)));
   const opts = form.type==="total" ? [["over","Over"],["under","Under"]] : [["away",dr.away],["home",dr.home]];
@@ -660,34 +864,53 @@ function bumpLine(dlt){ const v=num($("pfLine").value); $("pfLine").value = Stri
 
 async function savePick(e){
   e.preventDefault();
-  const away=$("pfAway").value.trim(), home=$("pfHome").value.trim(), line=num($("pfLine").value);
-  const err = !away||!home ? "Enter both teams." : !form.side ? "Choose a side." : line===null ? "Enter the line." : (form.type==="total"&&line<=0) ? "A total needs to be above zero." : null;
-  if(err){ $("pfErr").textContent=err; $("pfErr").hidden=false; return; }
+  if(!form || form.pane==="locked" || form.pane==="slate") return;
   const slot = form.editing ? form.slot : Number($("pfPlayer").value);
   if(!form.editing && getPick(form.day,slot)){ $("pfErr").textContent=`${S.players[slot]} already has a pick for this day. Edit that one instead.`; $("pfErr").hidden=false; return; }
-  const doc={ day:form.day, slot, type:form.type, side:form.side, away, home, line,
-    awayScore:num($("pfAwayS").value), homeScore:num($("pfHomeS").value), manual:$("pfManual").value||null, updatedAt:Date.now() };
-  const newR=result(doc), prevR=form.prevResult, wasEditing=form.editing;
+  let doc;
+  if(form.pane==="bet"){
+    if(!form.bet){ $("pfErr").textContent="Choose a side or the total."; $("pfErr").hidden=false; return; }
+    doc={ eventId:form.game.id, type:form.bet.type, side:form.bet.side };
+  } else {
+    const away=$("pfAway").value.trim(), home=$("pfHome").value.trim(), line=num($("pfLine").value);
+    const err = !away||!home ? "Enter both teams." : !form.side ? "Choose a side." : line===null ? "Enter the line." : (form.type==="total"&&line<=0) ? "A total needs to be above zero." : null;
+    if(err){ $("pfErr").textContent=err; $("pfErr").hidden=false; return; }
+    doc={ day:form.day, slot, type:form.type, side:form.side, away, home, line,
+      awayScore:num($("pfAwayS").value), homeScore:num($("pfHomeS").value), manual:$("pfManual").value||null };
+  }
+  const prevR=form.prevResult, wasEditing=form.editing, name=S.players[slot];
   $("pfSave").disabled=true;
   try{
     await db.doc("picks/"+pid(form.day,slot)).set(doc);
     closeSheets();
-    if(newR && newR!==prevR){
-      if(newR==="W"){ toast(`${S.players[slot]} cashes it`); confetti(); }
-      else if(newR==="L") toast("Tough beat. Graded as a loss.");
-      else toast("Push. Nobody gets hurt.");
-    } else toast(wasEditing ? "Pick updated" : "Pick locked in");
+    const newR=result(getPick(form?.day??0,slot));
+    toast(wasEditing ? "Pick updated" : `${name}'s pick is locked in`);
   } catch(x){
-    $("pfErr").textContent = x?.code==="bad_request" ? x.message : "Couldn't save. Check your connection and try again.";
+    $("pfErr").textContent = x?.message && x.code!=="unavailable" ? x.message : "Couldn't save. Check your connection and try again.";
     $("pfErr").hidden=false;
+    if(form?.pane==="bet" && x?.message && /kicked off|slate|line/i.test(x.message)) loadSlate(form.day,true);
   } finally { $("pfSave").disabled=false; }
 }
 async function deletePick(){
   const b=$("pfDel");
   if(!b.dataset.armed){ b.dataset.armed="1"; b.textContent="Tap again to delete"; return; }
   try{ await db.doc("picks/"+pid(form.day,form.slot)).delete(); closeSheets(); toast("Pick deleted"); }
-  catch(x){ $("pfErr").textContent="Couldn't delete the pick. Try again."; $("pfErr").hidden=false; }
+  catch(x){ $("pfErr").textContent=x?.message||"Couldn't delete the pick. Try again."; $("pfErr").hidden=false; }
 }
+
+$("slateList").addEventListener("click",e=>{
+  if(e.target.id==="slateRetry"){ loadSlate(form.day,true); return; }
+  const b=e.target.closest("[data-gid]"); if(!b||b.disabled) return;
+  const g=(slates[form.day]?.games||[]).find(x=>x.id===b.dataset.gid); if(!g) return;
+  if(!form.game || form.game.id!==g.id) form.bet=null;
+  form.game=g; showPane("bet");
+});
+$("slateQ").addEventListener("input",renderSlate);
+$("bets").addEventListener("click",e=>{ const b=e.target.closest(".bet"); if(!b||b.disabled) return; form.bet={type:b.dataset.type, side:b.dataset.side}; renderBet(); });
+$("toSlate").addEventListener("click",()=>{ showPane("slate"); loadSlate(form.day); });
+$("toManual").addEventListener("click",()=>{ form.type=form.type||"spread"; showPane("manual"); setTimeout(()=>$("pfAway").focus({preventScroll:true}),50); });
+$("manualBack").addEventListener("click",()=>{ showPane("slate"); loadSlate(form.day); });
+$("pfX").addEventListener("click",closeSheets);
 
 /* ---------- settings ---------- */
 function openSettings(){
@@ -767,7 +990,12 @@ function applyState(j){
   const d = j.settings || {};
   const players = Array.isArray(d.players)&&d.players.length===DEFAULTS.players.length ? d.players : DEFAULTS.players;
   S = { players:[...players], startDate:d.startDate||DEFAULTS.startDate, offDays:Array.isArray(d.offDays)?[...d.offDays]:[] };
+  const before = ready && me!==null ? Object.fromEntries(Object.entries(P).filter(([,q])=>String(q.slot)===me).map(([k,q])=>[k,result(q)])) : null;
   P = j.picks || {};
+  if(before){
+    const cashed = Object.entries(P).find(([k,q])=>String(q.slot)===me && result(q)==="W" && before[k]!==undefined && before[k]!=="W");
+    if(cashed){ setTimeout(()=>{ toast("Your pick cashed"); confetti(); }, 50); }
+  }
   if(!ready){ ready=true; selDay=Math.min(Math.max(todayIdx(),0),DAYS-1); renderAll(true); }
   else renderAll(false);
 }
