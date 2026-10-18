@@ -36,6 +36,7 @@ export interface Pick {
   updatedAt: number
   // Set when the pick was made from the live ESPN slate
   eventId?: string | null
+  league?: 'cfb' | 'nfl'
   kickoff?: string | null
   awayAbbr?: string
   homeAbbr?: string

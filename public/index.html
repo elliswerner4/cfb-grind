@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="44-Day Grind">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2313201A'/%3E%3Ctext x='32' y='44' font-family='Impact,sans-serif' font-size='34' fill='%23EBB233' text-anchor='middle'%3E44%3C/text%3E%3C/svg%3E">
-<title>CFB 44-Day Pick'em</title>
+<title>The 44-Day Grind</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
 <style>
@@ -275,6 +275,7 @@ img{max-width:100%}
 .locked{background:var(--sunk);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:6px}
 .locked .pick{font-size:30px}
 .chip.live{background:var(--loss-soft);color:var(--loss)}
+.lg-tag{font-size:9.5px;font-weight:700;letter-spacing:.08em;padding:1px 5px;border-radius:4px;background:var(--ink);color:var(--bg);line-height:1.4}
 .livebox{display:flex;flex-direction:column;gap:6px;background:var(--sunk);border-radius:10px;padding:9px 10px}
 .livebox .lb-top{display:flex;justify-content:space-between;gap:8px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
 .livebox .lb-row{display:flex;align-items:center;gap:8px;font-size:14px}
@@ -296,7 +297,7 @@ img{max-width:100%}
 <div class="board"><div class="in">
   <div class="row">
     <div class="brand">
-      <div class="eyebrow" id="eyebrow">College football · 44 straight days</div>
+      <div class="eyebrow" id="eyebrow">College football + NFL · 44 straight days</div>
       <h1>The 44-Day <span>Grind</span></h1>
     </div>
     <div class="hctl">
@@ -351,6 +352,7 @@ img{max-width:100%}
     <label class="field" id="pfPlayerWrap"><span>Player</span><select id="pfPlayer"></select></label>
 
     <div id="paneSlate" class="pane">
+      <div class="seg" id="slateLeague" role="tablist" aria-label="League"><button type="button" data-v="all" aria-pressed="true">All</button><button type="button" data-v="cfb" aria-pressed="false">College</button><button type="button" data-v="nfl" aria-pressed="false">NFL</button></div>
       <input id="slateQ" class="search" type="search" placeholder="Search a team" autocomplete="off" aria-label="Search games">
       <div id="slateList" class="slate" aria-live="polite"></div>
       <button type="button" class="linkish" id="toManual">Game not listed? Enter it by hand</button>
@@ -653,7 +655,7 @@ function renderDay(){
   const picks = S.players.map((_,s)=>getPick(d,s));
   let body;
   if(off){
-    body=`<div class="offnote">No college football on this day. It doesn't count toward anyone's picks or streaks.</div>`;
+    body=`<div class="offnote">No college or NFL games on this day. It doesn't count toward anyone's picks or streaks.</div>`;
   } else {
     const slots = S.players.map((_,s)=>s);
     if(me!==null){ const m=Number(me); slots.splice(slots.indexOf(m),1); slots.unshift(m); }
@@ -667,7 +669,7 @@ function renderDay(){
         const tl = picks.map((q,o)=>{ if(o===s||!q||q.type!==p.type||gameKey(q)!==gameKey(p)) return ""; return q.side===p.side ? `<span class="tag tail">Same as ${esc(S.players[o])}</span>` : `<span class="tag fade">Fading ${esc(S.players[o])}</span>`; }).join("");
         tags = tl ? `<div class="tags">${tl}</div>` : "";
         const gl = p.eventId
-          ? `<div class="matchline">${logo(p.awayLogo,"sm")}${esc(p.away)} @ ${logo(p.homeLogo,"sm")}${esc(p.home)}${ls==="pre"&&p.kickoff?` · ${esc(fmtTime(p.kickoff))}`:""}</div>`
+          ? `<div class="matchline">${p.league==="nfl"?`<span class="lg-tag">NFL</span>`:""}${logo(p.awayLogo,"sm")}${esc(p.away)} @ ${logo(p.homeLogo,"sm")}${esc(p.home)}${ls==="pre"&&p.kickoff?` · ${esc(fmtTime(p.kickoff))}`:""}</div>`
           : `<div class="game">${esc(p.away)} @ ${esc(p.home)} · ${p.type==="total"?"total":"spread"} · entered by hand</div>`;
         inner=`<div class="pick">${esc(pickLabel(p))}</div>${gl}${sc}${tags}`;
       } else {
@@ -759,16 +761,19 @@ function renderSlate(){
   if(!c || (c.loading && !c.games)){ el.innerHTML=`<div class="msg">Loading the slate…</div>`; return; }
   if(c.err && !c.games){ el.innerHTML=`<div class="msg">${esc(c.err)}<br><br><button type="button" class="btn small" id="slateRetry">Try again</button></div>`; return; }
   const q=$("slateQ").value.trim().toLowerCase();
-  const games=(c.games||[]).filter(g=>!q || [g.away.name,g.away.full,g.away.abbr,g.home.name,g.home.full,g.home.abbr].some(x=>(x||"").toLowerCase().includes(q)))
+  const lg=form.league||"all", all=c.games||[];
+  const cnt={all:all.length, cfb:all.filter(g=>g.league!=="nfl").length, nfl:all.filter(g=>g.league==="nfl").length};
+  [...$("slateLeague").children].forEach(b=>{ b.setAttribute("aria-pressed",String(b.dataset.v===lg)); b.textContent={all:"All",cfb:"College",nfl:"NFL"}[b.dataset.v]+(cnt[b.dataset.v]?` · ${cnt[b.dataset.v]}`:""); });
+  const games=all.filter(g=>lg==="all" || (lg==="nfl")===(g.league==="nfl")).filter(g=>!q || [g.away.name,g.away.full,g.away.abbr,g.home.name,g.home.full,g.home.abbr].some(x=>(x||"").toLowerCase().includes(q)))
     .sort((x,y)=>gameRank(x)-gameRank(y) || x.start.localeCompare(y.start));
-  if(!c.games.length){ el.innerHTML=`<div class="msg">No FBS games on ${esc(fmtLong(dayDate(form.day)))}.<br>Close this and tap "No games this day" so it doesn't count.</div>`; return; }
-  if(!games.length){ el.innerHTML=`<div class="msg">No games match "${esc(q)}".</div>`; return; }
+  if(!c.games.length){ el.innerHTML=`<div class="msg">No college or NFL games on ${esc(fmtLong(dayDate(form.day)))}.<br>Close this and tap "No games this day" so it doesn't count.</div>`; return; }
+  if(!games.length){ el.innerHTML=`<div class="msg">${q?`No games match "${esc(q)}".`:lg==="nfl"?"No NFL games this day.":"No college games this day."}</div>`; return; }
   el.innerHTML=games.map(g=>{
     const started = g.state!=="pre" || Date.parse(g.start)<=Date.now();
     const time = g.state==="in" ? `<span class="livedot"></span>Live · ${esc(g.detail)}` : g.state==="post" ? `Final` : `${esc(fmtTime(g.start))}${started?" · Locked":""}`;
     const val = (t,line) => started ? (t.score ?? "") : (line===null ? "—" : fmtLine(line));
-    return `<button type="button" class="gm" data-gid="${esc(g.id)}" ${started?"disabled":""}>
-      <span class="gm-time">${time}</span>
+    return `<button type="button" class="gm" data-gid="${esc(g.id)}" data-lg="${g.league||"cfb"}" ${started?"disabled":""}>
+      <span class="gm-time">${g.league==="nfl"?`<span class="lg-tag">NFL</span>`:""}${time}</span>
       <span class="gm-team">${logo(g.away.logo)}${rk(g.away.rank)}<b>${esc(g.away.name)}</b></span><span class="gm-val">${val(g.away,g.spreadAway)}</span>
       <span class="gm-team">${logo(g.home.logo)}${rk(g.home.rank)}<b>${esc(g.home.name)}</b></span><span class="gm-val">${val(g.home,g.spreadHome)}</span>
       ${started?"":`<span class="gm-ou">O/U ${g.total===null?"—":g.total}</span>`}
@@ -780,7 +785,7 @@ function renderBet(){
   const g=form.game; if(!g) return;
   $("betGame").innerHTML=`<div class="matchup">
     <div class="side">${logo(g.away.logo,"lg")}<b>${rk(g.away.rank)} ${esc(g.away.name)}</b></div>
-    <div class="mid">${esc(fmtTime(g.start))}<br>@</div>
+    <div class="mid">${g.league==="nfl"?`<span class="lg-tag">NFL</span><br>`:""}${esc(fmtTime(g.start))}<br>@</div>
     <div class="side">${logo(g.home.logo,"lg")}<b>${rk(g.home.rank)} ${esc(g.home.name)}</b></div></div>`;
   const opts=[
     {type:"spread",side:"away",k:"Spread",lbl:`${g.away.abbr||g.away.name} ${g.spreadAway===null?"":fmtLine(g.spreadAway)}`,ok:g.spreadAway!==null},
@@ -805,7 +810,7 @@ function renderLocked(p){
 
 function openPick(day, slot){
   const p=getPick(day,slot);
-  form={ day, slot, editing:!!p, type:p?.type||"spread", side:p?.side||null, prevResult:result(p), game:null, bet:null, pane:null };
+  form={ day, slot, editing:!!p, type:p?.type||"spread", side:p?.side||null, prevResult:result(p), game:null, bet:null, pane:null, league:"all" };
   $("pfTitle").textContent = p ? "Your pick" : (String(slot)===me?"Make your pick":`Pick for ${S.players[slot]}`);
   if(p && String(slot)!==me) $("pfTitle").textContent = `${S.players[slot]}'s pick`;
   $("pfLead").textContent = `Day ${day+1} · ${fmtLong(dayDate(day))}`;
@@ -828,7 +833,7 @@ function openPick(day, slot){
   if(p && p.eventId){
     form.bet={type:p.type, side:p.side};
     showPane("slate");
-    loadSlate(day).then(c=>{ const g=(c.games||[]).find(x=>x.id===p.eventId); if(g && form){ form.game=g; showPane("bet"); } });
+    loadSlate(day).then(c=>{ const g=(c.games||[]).find(x=>x.id===p.eventId && (!p.league || x.league===p.league)); if(g && form){ form.game=g; showPane("bet"); } });
     return;
   }
   showPane("slate");
@@ -870,7 +875,7 @@ async function savePick(e){
   let doc;
   if(form.pane==="bet"){
     if(!form.bet){ $("pfErr").textContent="Choose a side or the total."; $("pfErr").hidden=false; return; }
-    doc={ eventId:form.game.id, type:form.bet.type, side:form.bet.side };
+    doc={ eventId:form.game.id, league:form.game.league, type:form.bet.type, side:form.bet.side };
   } else {
     const away=$("pfAway").value.trim(), home=$("pfHome").value.trim(), line=num($("pfLine").value);
     const err = !away||!home ? "Enter both teams." : !form.side ? "Choose a side." : line===null ? "Enter the line." : (form.type==="total"&&line<=0) ? "A total needs to be above zero." : null;
@@ -901,11 +906,12 @@ async function deletePick(){
 $("slateList").addEventListener("click",e=>{
   if(e.target.id==="slateRetry"){ loadSlate(form.day,true); return; }
   const b=e.target.closest("[data-gid]"); if(!b||b.disabled) return;
-  const g=(slates[form.day]?.games||[]).find(x=>x.id===b.dataset.gid); if(!g) return;
+  const g=(slates[form.day]?.games||[]).find(x=>x.id===b.dataset.gid && (x.league||"cfb")===b.dataset.lg); if(!g) return;
   if(!form.game || form.game.id!==g.id) form.bet=null;
   form.game=g; showPane("bet");
 });
 $("slateQ").addEventListener("input",renderSlate);
+$("slateLeague").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b||!form) return; form.league=b.dataset.v; renderSlate(); });
 $("bets").addEventListener("click",e=>{ const b=e.target.closest(".bet"); if(!b||b.disabled) return; form.bet={type:b.dataset.type, side:b.dataset.side}; renderBet(); });
 $("toSlate").addEventListener("click",()=>{ showPane("slate"); loadSlate(form.day); });
 $("toManual").addEventListener("click",()=>{ form.type=form.type||"spread"; showPane("manual"); setTimeout(()=>$("pfAway").focus({preventScroll:true}),50); });

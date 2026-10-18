@@ -1,4 +1,4 @@
-import { espnDate, getSlate, hasStarted, Game } from './espn'
+import { espnDate, getSlate, hasStarted, Game, num } from './espn'
 import { claimSettle, DAYS, getAllPicks, getPick, getSettings, Pick, PICK_ID, PLAYER_COUNT, putPicks } from './store'
 
 /** Day number (0-based) for today's date in US Eastern time. */
@@ -25,10 +25,13 @@ export async function buildEventPick(id: string, body: any): Promise<Pick> {
   await assertNotLocked(id)
   const settings = await getSettings()
   const games = await getSlate(espnDate(settings.startDate, day), true)
-  const g = games.find((x) => x.id === String(body.eventId))
+  const g = games.find((x) => x.id === String(body.eventId) && (!body.league || x.league === body.league))
   if (!g) throw new HttpError(400, "That game isn't on this day's slate")
-  if (hasStarted(g)) throw new HttpError(409, 'That game has kicked off. Picks lock at kickoff.')
-  const line = type === 'total' ? g.total : side === 'home' ? g.spreadHome : g.spreadAway
+  // One-time exception: Day 1 picks were made before the site existed, so they can be logged
+  // after kickoff with the line the group actually took. Closed after Oct 18, 2026.
+  const backfill = day === 0 && Date.now() < Date.parse('2026-10-19T04:00:00Z') && num(body?.backfillLine) !== null
+  if (hasStarted(g) && !backfill) throw new HttpError(409, 'That game has kicked off. Picks lock at kickoff.')
+  const line = backfill ? num(body.backfillLine) : type === 'total' ? g.total : side === 'home' ? g.spreadHome : g.spreadAway
   if (line === null) throw new HttpError(409, `No ${type === 'total' ? 'total' : 'spread'} posted for this game yet`)
 
   return {
@@ -37,7 +40,7 @@ export async function buildEventPick(id: string, body: any): Promise<Pick> {
     awayAbbr: g.away.abbr, homeAbbr: g.home.abbr,
     awayLogo: g.away.logo, homeLogo: g.home.logo,
     awayScore: null, homeScore: null, manual: null,
-    eventId: g.id, kickoff: g.start,
+    eventId: g.id, league: g.league, kickoff: g.start,
     live: { state: g.state, detail: g.detail, away: null, home: null },
     updatedAt: Date.now(),
   }
@@ -75,7 +78,7 @@ export async function settle(opts: { everySec?: number; force?: boolean } = {}):
 
   const changed: Record<string, Pick> = {}
   for (const [id, p] of pending) {
-    const g = byDate.get(espnDate(settings.startDate, p.day))?.find((x) => x.id === p.eventId)
+    const g = byDate.get(espnDate(settings.startDate, p.day))?.find((x) => x.id === p.eventId && (!p.league || x.league === p.league))
     if (!g) continue
     const live = { state: g.state, detail: g.detail, away: g.away.score, home: g.home.score }
     const final = g.state === 'post' && g.completed && g.away.score !== null && g.home.score !== null

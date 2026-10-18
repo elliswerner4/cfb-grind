@@ -1,11 +1,15 @@
 /**
- * ESPN college football scoreboard (public JSON, no key).
- * FBS only (groups=80). Odds come from ESPN's sportsbook partner (DraftKings at time of writing).
+ * ESPN scoreboards (public JSON, no key): FBS college football (groups=80) and the NFL.
+ * Odds come from ESPN's sportsbook partner (DraftKings at time of writing).
  */
 import { kv } from '@vercel/kv'
 import { useKV } from './store'
 
-const BASE = 'https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard'
+export type League = 'cfb' | 'nfl'
+const SOURCES: Record<League, string> = {
+  cfb: 'https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?groups=80&limit=400&dates=',
+  nfl: 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?limit=100&dates=',
+}
 
 export interface Team {
   id: string
@@ -20,6 +24,7 @@ export interface Team {
 
 export interface Game {
   id: string
+  league: League
   start: string // ISO
   state: 'pre' | 'in' | 'post'
   completed: boolean
@@ -86,7 +91,7 @@ export function parseLines(odds: any, home: Team, away: Team) {
   return { spreadHome: h, spreadAway: a, total: total !== null && total > 0 ? total : null, provider: o?.provider?.name ?? null }
 }
 
-export function parseScoreboard(json: any): Game[] {
+export function parseScoreboard(json: any, league: League = 'cfb'): Game[] {
   const events: any[] = Array.isArray(json?.events) ? json.events : []
   return events.map((e) => {
     const comp = e?.competitions?.[0] ?? {}
@@ -98,6 +103,7 @@ export function parseScoreboard(json: any): Game[] {
     if (state === 'pre') { home.score = null; away.score = null }
     return {
       id: String(e.id),
+      league,
       start: comp.date || e.date,
       state,
       completed: !!st.completed,
@@ -119,9 +125,25 @@ export function espnDate(startDate: string, day: number): string {
 const memCache = new Map<string, { at: number; games: Game[] }>()
 const TTL_SEC = 45
 
-/** Slate for one ET date, cached ~45s in KV so many phones don't hammer ESPN. */
+async function fetchLeague(league: League, date: string): Promise<Game[]> {
+  // Local testing only: point ESPN_FIXTURE / ESPN_FIXTURE_NFL at saved scoreboard JSON files.
+  const fixture = league === 'cfb' ? process.env.ESPN_FIXTURE : process.env.ESPN_FIXTURE_NFL
+  if (process.env.ESPN_FIXTURE) {
+    if (!fixture) return []
+    const { readFile } = await import('fs/promises')
+    return parseScoreboard(JSON.parse(await readFile(fixture, 'utf8')), league)
+  }
+  const res = await fetch(SOURCES[league] + date, {
+    cache: 'no-store',
+    headers: { 'User-Agent': 'Mozilla/5.0 (cfb-grind pick tracker)' },
+  })
+  if (!res.ok) throw new Error(`ESPN ${league} ${res.status}`)
+  return parseScoreboard(await res.json(), league)
+}
+
+/** College + NFL slate for one ET date, cached ~45s in KV so many phones don't hammer ESPN. */
 export async function getSlate(date: string, fresh = false): Promise<Game[]> {
-  const key = `slate:${date}`
+  const key = `slate2:${date}`
   if (!fresh) {
     if (useKV()) {
       const hit = await kv.get<Game[]>(key)
@@ -131,17 +153,10 @@ export async function getSlate(date: string, fresh = false): Promise<Game[]> {
       if (hit && Date.now() - hit.at < TTL_SEC * 1000) return hit.games
     }
   }
-  // Local testing only: point ESPN_FIXTURE at a saved scoreboard JSON file.
-  if (process.env.ESPN_FIXTURE) {
-    const { readFile } = await import('fs/promises')
-    return parseScoreboard(JSON.parse(await readFile(process.env.ESPN_FIXTURE, 'utf8')))
-  }
-  const res = await fetch(`${BASE}?dates=${date}&groups=80&limit=400`, {
-    cache: 'no-store',
-    headers: { 'User-Agent': 'Mozilla/5.0 (cfb-grind pick tracker)' },
-  })
-  if (!res.ok) throw new Error(`ESPN ${res.status}`)
-  const games = parseScoreboard(await res.json())
+  const results = await Promise.allSettled([fetchLeague('cfb', date), fetchLeague('nfl', date)])
+  if (results.every((r) => r.status === 'rejected')) throw (results[0] as PromiseRejectedResult).reason
+  const games = results.flatMap((r) => (r.status === 'fulfilled' ? r.value : []))
+    .sort((x, y) => x.start.localeCompare(y.start) || x.home.name.localeCompare(y.home.name))
   if (useKV()) await kv.set(key, games, { ex: TTL_SEC })
   else memCache.set(key, { at: Date.now(), games })
   return games
