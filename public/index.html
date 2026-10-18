@@ -336,7 +336,7 @@ img{max-width:100%}
   <section id="day"></section>
 
   <section>
-    <div class="sec-h"><h2>Trophy case</h2><small>Updates as games are graded</small></div>
+    <div class="sec-h"><h2>Trophy case</h2><small>Updates automatically as games go final</small></div>
     <div class="trophies" id="trophies"></div>
   </section>
 </div>
@@ -610,7 +610,7 @@ function niceStep(raw){ const p=Math.pow(10,Math.floor(Math.log10(raw))); const 
 function renderRace(){
   const el=$("race"); const t=todayIdx();
   const graded = ST.some(s=>s.w+s.l>0);
-  if(!graded || t<0){ el.innerHTML=`<div class="chart-empty">The race starts once the first game is graded. Enter a final score on any pick and the lines start moving.</div>`; return; }
+  if(!graded || t<0){ el.innerHTML=`<div class="chart-empty">The race starts once the first pick is graded. Scores come in automatically as games finish.</div>`; return; }
   const n=ST[0].series.length;
   const W=Math.max(320, Math.min(el.clientWidth-28, 940)), H=Math.round(Math.min(260, Math.max(190, W*.36)));
   const pl=40, pr=14, pt=12, pb=26;
