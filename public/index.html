@@ -1,0 +1,812 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#13201A">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="44-Day Grind">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2313201A'/%3E%3Ctext x='32' y='44' font-family='Impact,sans-serif' font-size='34' fill='%23EBB233' text-anchor='middle'%3E44%3C/text%3E%3C/svg%3E">
+<title>CFB 44-Day Pick'em</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: scoreboard band with season progress → your pick today → standings with form + streaks → units race → 44-day strip → selected day → trophy case. */
+:root{
+  --bg:#EDF0EA; --surface:#FFFFFF; --sunk:#E2E7DF; --line:#CAD2C6;
+  --ink:#13201A; --muted:#58675E;
+  --accent:#C98A06; --accent-soft:#F7E8C3;
+  --win:#1C7F48; --win-soft:#D6EEDE; --loss:#B8352F; --loss-soft:#F6DAD7; --push:#67716C; --push-soft:#E1E5E2;
+  --fire:#E0601B; --ice:#2E86C9;
+  --board:#13201A; --board-2:#1D2D24; --board-ink:#F1F4EF; --board-muted:#A9B8AE;
+  --p0:#2E6BD1; --p1:#8E4DD6; --p2:#0F9A8E; --p3:#D6457E; --p4:#B5651D;
+  --display:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0D1410; --surface:#151F18; --sunk:#1C2820; --line:#2B3930;
+  --ink:#E5ECE6; --muted:#93A399;
+  --accent:#EBB233; --accent-soft:#3A3016;
+  --win:#4BC27E; --win-soft:#163824; --loss:#F0716A; --loss-soft:#432220; --push:#A3ADA8; --push-soft:#28302B;
+  --fire:#FF8A3D; --ice:#6CB6F0;
+  --board:#060B08; --board-2:#111B15; --board-ink:#F1F4EF; --board-muted:#93A399;
+  --p0:#6FA0F5; --p1:#B98AF2; --p2:#3CC7B8; --p3:#F07AA8; --p4:#E39A5C;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0D1410; --surface:#151F18; --sunk:#1C2820; --line:#2B3930;
+  --ink:#E5ECE6; --muted:#93A399;
+  --accent:#EBB233; --accent-soft:#3A3016;
+  --win:#4BC27E; --win-soft:#163824; --loss:#F0716A; --loss-soft:#432220; --push:#A3ADA8; --push-soft:#28302B;
+  --fire:#FF8A3D; --ice:#6CB6F0;
+  --board:#060B08; --board-2:#111B15; --board-ink:#F1F4EF; --board-muted:#93A399;
+  --p0:#6FA0F5; --p1:#B98AF2; --p2:#3CC7B8; --p3:#F07AA8; --p4:#E39A5C;
+  color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--board)}
+.wrap{max-width:980px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 56px;display:flex;flex-direction:column;gap:30px}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.ico{width:1em;height:1em;vertical-align:-.12em;flex:none}
+
+/* ---------- scoreboard ---------- */
+.board{background:var(--board);color:var(--board-ink);position:relative;overflow:hidden}
+.board::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(90deg,transparent 0 calc(10% - 1px),rgba(255,255,255,.045) calc(10% - 1px) 10%)}
+.board .in{position:relative;z-index:1;max-width:980px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 18px;display:flex;flex-direction:column;gap:16px}
+.board .row{display:flex;flex-wrap:wrap;gap:14px 20px;align-items:flex-end;justify-content:space-between}
+.brand .eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--board-muted);font-weight:600}
+.brand h1{font-family:var(--display);font-weight:900;font-size:clamp(38px,9vw,60px);line-height:.85;margin:4px 0 0;text-transform:uppercase;letter-spacing:.005em}
+.brand h1 span{color:var(--accent)}
+.hctl{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.hctl select,.ghost{background:var(--board-2);border:1px solid rgba(255,255,255,.14);border-radius:8px;padding:8px 11px;color:var(--board-ink);font-size:14px}
+.hctl select option{color:#13201A;background:#fff}
+.meta{display:flex;flex-wrap:wrap;gap:8px 22px;align-items:baseline}
+.stat{display:flex;flex-direction:column;gap:1px}
+.stat b{font-family:var(--display);font-weight:800;font-size:28px;line-height:1}
+.stat small{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--board-muted)}
+.progress{display:flex;gap:2px;height:10px}
+.progress i{flex:1;border-radius:2px;background:rgba(255,255,255,.1)}
+.progress i.done{background:rgba(255,255,255,.38)}
+.progress i.off{background:rgba(255,255,255,.04);outline:1px dashed rgba(255,255,255,.12);outline-offset:-1px}
+.progress i.now{background:var(--accent)}
+
+/* ---------- shared ---------- */
+.banner{border:1px solid var(--accent);background:var(--accent-soft);border-radius:10px;padding:12px 14px;font-size:14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.banner b{font-weight:600}
+.sec-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:0 0 12px;flex-wrap:wrap}
+.sec-h h2{font-family:var(--display);font-weight:800;font-size:28px;line-height:1;text-transform:uppercase;letter-spacing:.01em;margin:0}
+.sec-h small{color:var(--muted);font-size:12.5px}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:9px 14px;font-size:14px;font-weight:500;display:inline-flex;gap:6px;align-items:center;justify-content:center}
+.btn:hover:not(:disabled){border-color:var(--ink)}
+.btn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.btn.gold{background:var(--accent);color:#1A1405;border-color:var(--accent);font-weight:600}
+.btn.small{padding:6px 11px;font-size:13px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.av{--c:var(--p0);width:26px;height:26px;border-radius:50%;background:var(--c);color:#fff;display:inline-grid;place-items:center;font-size:11px;font-weight:600;flex:none;letter-spacing:.02em}
+.av.lg{width:36px;height:36px;font-size:14px}
+.av.ghosted{background:transparent;color:var(--muted);border:1.5px dashed var(--line)}
+.chip{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;border-radius:999px;padding:3px 9px;white-space:nowrap;display:inline-flex;gap:4px;align-items:center}
+.chip.W{background:var(--win-soft);color:var(--win)} .chip.L{background:var(--loss-soft);color:var(--loss)} .chip.P{background:var(--push-soft);color:var(--push)}
+.chip.pend{background:var(--accent-soft);color:var(--ink)} .chip.none{background:var(--sunk);color:var(--muted)} .chip.miss{background:var(--loss-soft);color:var(--loss)}
+.chip.fire{background:transparent;color:var(--fire);border:1px solid currentColor}
+.chip.ice{background:transparent;color:var(--ice);border:1px solid currentColor}
+.form{display:inline-flex;gap:3px}
+.form i{width:20px;height:20px;border-radius:5px;display:grid;place-items:center;font-style:normal;font-size:10.5px;font-weight:700;font-family:var(--mono)}
+.form i.W{background:var(--win);color:#fff} .form i.L{background:var(--loss);color:#fff} .form i.P{background:var(--push);color:#fff}
+.form i.e{background:var(--sunk)}
+
+/* ---------- your pick today ---------- */
+.hero{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:center}
+.hero.need{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.hero .k{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.hero .big{font-family:var(--display);font-weight:900;font-size:clamp(30px,7vw,42px);line-height:.95;text-transform:uppercase;margin-top:4px;overflow-wrap:anywhere}
+.hero .sub{color:var(--muted);font-size:14px;margin-top:6px}
+.hero .who-in{display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin-top:12px;font-size:13px;color:var(--muted)}
+@media (max-width:560px){.hero{grid-template-columns:1fr}.hero .btn{width:100%}}
+.whoami{display:flex;flex-wrap:wrap;gap:8px}
+.whoami button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 12px 6px 6px;display:inline-flex;gap:8px;align-items:center;font-weight:500}
+
+/* ---------- standings ---------- */
+.tbl-wrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:14px}
+table{width:100%;border-collapse:collapse;min-width:560px}
+th,td{padding:11px 12px;text-align:left;white-space:nowrap;vertical-align:middle}
+th{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;border-bottom:1px solid var(--line)}
+th.r,td.r{text-align:right}
+tbody tr+tr td{border-top:1px solid var(--line)}
+td.rank{font-family:var(--display);font-weight:900;font-size:24px;width:40px;color:var(--muted);text-align:center}
+tr.lead td.rank{color:var(--accent)}
+.pl{display:flex;gap:10px;align-items:center}
+.pl .nm{font-weight:600;display:flex;gap:6px;align-items:center}
+.pl .sm{font-size:12px;color:var(--muted)}
+.you{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;background:var(--accent-soft);color:var(--ink);border-radius:4px;padding:2px 5px;font-weight:600}
+.rec{font-family:var(--display);font-weight:800;font-size:22px;line-height:1}
+.rec+small{display:block;font-size:12px;color:var(--muted);font-family:var(--mono)}
+.units{font-weight:600}
+.pos{color:var(--win)} .neg{color:var(--loss)}
+
+/* ---------- race chart ---------- */
+.chart-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 14px 12px}
+.chart-card svg{display:block;width:100%;height:auto}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px;font-size:13px}
+.legend span{display:inline-flex;gap:6px;align-items:center}
+.legend i{width:12px;height:3px;border-radius:2px;background:var(--c)}
+.chart-empty{padding:34px 10px;text-align:center;color:var(--muted)}
+
+/* ---------- strip ---------- */
+.strip{display:flex;gap:6px;overflow-x:auto;padding:2px 2px 10px;scroll-snap-type:x proximity}
+.dbtn{flex:0 0 66px;scroll-snap-align:center;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 4px 9px;display:flex;flex-direction:column;align-items:center;gap:2px;position:relative}
+.dbtn .dn{font-family:var(--display);font-weight:900;font-size:24px;line-height:1}
+.dbtn .dw{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);line-height:1.2}
+.dbtn .dots{display:flex;gap:3px;margin-top:5px;height:7px;align-items:center}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--sunk);border:1px solid var(--line)}
+.dot.pend{background:var(--accent);border-color:var(--accent)}
+.dot.W{background:var(--win);border-color:var(--win)} .dot.L{background:var(--loss);border-color:var(--loss)} .dot.P{background:var(--push);border-color:var(--push)}
+.dbtn .off{font-size:9.5px;font-weight:700;letter-spacing:.1em;color:var(--muted);margin-top:4px}
+.dbtn.today{border-color:var(--accent);border-width:2px;padding:7px 3px 8px}
+.dbtn.today::before{content:"TODAY";position:absolute;top:-8px;left:50%;transform:translateX(-50%);background:var(--accent);color:#1A1405;font-size:8.5px;font-weight:700;letter-spacing:.1em;padding:1px 5px;border-radius:3px}
+.dbtn.sel{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.dbtn.sel .dw,.dbtn.sel .off{color:var(--bg);opacity:.75}
+.dbtn.perfect .dn{color:var(--accent)}
+.legend-dots{display:flex;gap:12px;font-size:12px;color:var(--muted);align-items:center}
+.legend-dots span{display:inline-flex;gap:5px;align-items:center}
+
+/* ---------- day detail ---------- */
+.dayhead{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:10px;margin-bottom:14px}
+.dayhead h2{font-family:var(--display);font-weight:900;font-size:clamp(28px,6vw,38px);text-transform:uppercase;margin:0;line-height:.95}
+.dayhead .sub{color:var(--muted);font-size:13.5px;margin-top:6px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:9px;min-width:0}
+.card.me{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.card.W{border-left:4px solid var(--win)} .card.L{border-left:4px solid var(--loss)} .card.P{border-left:4px solid var(--push)}
+.card .top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.card .who{font-weight:600;display:flex;gap:8px;align-items:center;min-width:0}
+.card .who span{overflow:hidden;text-overflow:ellipsis}
+.pick{font-family:var(--display);font-weight:900;font-size:28px;line-height:.95;text-transform:uppercase;overflow-wrap:anywhere}
+.game{font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+.score{font-family:var(--mono);font-size:13px;background:var(--sunk);border-radius:6px;padding:5px 8px;align-self:flex-start}
+.tags{display:flex;flex-wrap:wrap;gap:5px}
+.tag{font-size:11.5px;border-radius:5px;padding:2px 7px;background:var(--sunk);color:var(--muted)}
+.tag.tail{color:var(--win)} .tag.fade{color:var(--loss)}
+.card .acts{display:flex;gap:8px;margin-top:auto;padding-top:2px}
+.empty{color:var(--muted);font-size:14px}
+.offnote{background:var(--sunk);border-radius:14px;padding:22px;text-align:center;color:var(--muted)}
+
+/* ---------- trophies ---------- */
+.trophies{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.trophy{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.trophy .t{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600;display:flex;gap:6px;align-items:center}
+.trophy .t .ico{color:var(--accent);width:14px;height:14px}
+.trophy .w{display:flex;gap:8px;align-items:center;font-weight:600;min-width:0}
+.trophy .w span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.trophy .v{font-family:var(--display);font-weight:800;font-size:26px;line-height:1}
+.trophy .d{font-size:12.5px;color:var(--muted)}
+.trophy.vacant .w{color:var(--muted);font-weight:500}
+
+/* ---------- sheets ---------- */
+.scrim{position:fixed;inset:0;background:rgba(5,10,7,.58);display:flex;align-items:flex-end;justify-content:center;z-index:20;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) 0 env(safe-area-inset-left,0px)}
+@media (min-width:640px){.scrim{align-items:center}}
+.sheet{background:var(--surface);color:var(--ink);width:100%;max-width:520px;max-height:94%;overflow-y:auto;border-radius:18px 18px 0 0;padding:20px 18px calc(18px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:14px}
+@media (min-width:640px){.sheet{border-radius:18px}}
+.sheet h3{font-family:var(--display);font-weight:900;font-size:28px;text-transform:uppercase;margin:0;line-height:1}
+.sheet .lead{color:var(--muted);font-size:13.5px;margin-top:-8px}
+.field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.field>span,.flabel{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.field input,.field select{border:1px solid var(--line);background:var(--bg);border-radius:9px;padding:10px 11px;width:100%;min-width:0}
+.row2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+.at{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:8px;align-items:end}
+.at .atsym{font-family:var(--display);font-weight:800;font-size:20px;color:var(--muted);padding-bottom:9px}
+.seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--bg)}
+.seg button{flex:1;border:0;background:transparent;padding:11px 6px;font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg);font-weight:600}
+.stepper{display:grid;grid-template-columns:auto minmax(0,1fr) auto;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--bg)}
+.stepper button{border:0;background:transparent;width:48px;font-size:20px;font-weight:600}
+.stepper input{border:0;border-inline:1px solid var(--line);border-radius:0;text-align:center;font-family:var(--mono);font-size:18px;font-weight:600;background:transparent;padding:10px 4px}
+.hint{font-size:12.5px;color:var(--muted)}
+.slip{border:1.5px dashed var(--line);border-radius:12px;padding:12px 14px;display:flex;justify-content:space-between;gap:10px;align-items:center}
+.slip .s1{font-family:var(--display);font-weight:900;font-size:24px;text-transform:uppercase;line-height:1;overflow-wrap:anywhere}
+.slip .s2{font-size:12.5px;color:var(--muted);margin-top:3px}
+details.final{border-top:1px solid var(--line);padding-top:12px}
+details.final summary{cursor:pointer;font-weight:600;font-size:14px;list-style:none;display:flex;justify-content:space-between;align-items:center}
+details.final summary::-webkit-details-marker{display:none}
+details.final summary::after{content:"+";font-size:20px;color:var(--muted)}
+details.final[open] summary::after{content:"–"}
+details.final .inner{display:flex;flex-direction:column;gap:12px;margin-top:12px}
+.sheet-acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.sheet-acts .spacer{flex:1}
+.danger{color:var(--loss);border-color:var(--loss)}
+.err{color:var(--loss);font-size:13.5px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:999px;font-size:14px;font-weight:500;z-index:40;white-space:nowrap}
+#confetti{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:35}
+@media (prefers-reduced-motion:no-preference){
+  .sheet{animation:up .2s cubic-bezier(.2,.8,.3,1)}
+  @keyframes up{from{transform:translateY(24px);opacity:.5}}
+  .hero.need .btn.gold{animation:nudge 2.4s ease-in-out infinite}
+  @keyframes nudge{0%,100%{box-shadow:0 0 0 0 var(--accent-soft)}50%{box-shadow:0 0 0 6px var(--accent-soft)}}
+}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;min-height:100vh}
+img{max-width:100%}
+[hidden]{display:none!important}
+.board .in{padding-top:calc(20px + env(safe-area-inset-top,0px))!important}
+.wrap{padding-bottom:calc(56px + env(safe-area-inset-bottom,0px))!important}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-fire" viewBox="0 0 24 24"><path fill="currentColor" d="M13.5 1.5c.4 3-1 4.7-2.6 6.4C9.3 9.6 7.5 11.4 7.5 14.5a4.5 4.5 0 0 0 2.3 3.9c-.4-1.9.4-3.3 1.6-4.5.3 1.7 1.4 2.6 2.4 3.5.5-.9.6-1.9.4-3 1.6 1.1 2.6 2.6 2.3 4.5A6 6 0 0 0 20 14c0-5.3-4-8.6-6.5-12.5ZM12 22.5c-3.9 0-7-2.8-7-7 0-2.4 1-4.3 2.4-5.9-.3 2.2.4 3.5 1.4 4.4.2-3.5 2.5-5.4 4.2-7.3C15.6 9.6 19 12 19 15.5c0 4.2-3.1 7-7 7Z" opacity=".25"/><path fill="currentColor" d="M13.4 1.6C14 4.8 12.4 6.6 10.8 8.3 9.2 10 7.4 11.8 7.4 14.8c0 2.6 1.6 4.8 3.9 5.6-.8-1.9-.2-3.7 1.4-5.2.2 1.6 1.2 2.6 2.4 3.4.6-1 .7-2.1.5-3.3 1.4 1.2 2.1 2.9 1.6 4.8 2-1 3.2-3.2 3.2-5.6 0-5.4-4.4-8.8-7-12.9Z"/></symbol>
+  <symbol id="i-ice" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 2v20M4 7l16 10M20 7 4 17M9 3.5 12 6l3-2.5M9 20.5 12 18l3 2.5M3 10.5l3.5-.5L5 6.8M21 13.5l-3.5.5 1.5 3.2M21 10.5l-3.5-.5L19 6.8M3 13.5l3.5.5L5 17.2"/></symbol>
+  <symbol id="i-trophy" viewBox="0 0 24 24"><path fill="currentColor" d="M7 3h10v2h3v3a4 4 0 0 1-3.6 4A5 5 0 0 1 13 15.9V18h3v3H8v-3h3v-2.1A5 5 0 0 1 7.6 12 4 4 0 0 1 4 8V5h3V3Zm0 4H6v1a2 2 0 0 0 1 1.7V7Zm10 0v2.7A2 2 0 0 0 18 8V7h-1Z"/></symbol>
+</svg>
+
+<div class="board"><div class="in">
+  <div class="row">
+    <div class="brand">
+      <div class="eyebrow" id="eyebrow">College football · 44 straight days</div>
+      <h1>The 44-Day <span>Grind</span></h1>
+    </div>
+    <div class="hctl">
+      <select id="meSel" aria-label="Who's using this device"></select>
+      <button class="ghost" id="setBtn">League settings</button>
+    </div>
+  </div>
+  <div class="meta" id="meta"></div>
+  <div class="progress" id="progress" aria-hidden="true"></div>
+</div></div>
+
+<div class="wrap">
+  <div id="banner" class="banner" hidden></div>
+  <section id="hero" hidden></section>
+
+  <section>
+    <div class="sec-h"><h2>Standings</h2><small>Units = 1 unit risked per pick at −110</small></div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th></th><th>Player</th><th>Record</th><th class="r">Units</th><th>Last 5</th><th>Streak</th></tr></thead>
+      <tbody id="standings"></tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <div class="sec-h"><h2>The race</h2><small>Running units, day by day</small></div>
+    <div class="chart-card" id="race"></div>
+  </section>
+
+  <section>
+    <div class="sec-h">
+      <h2>All 44 days</h2>
+      <div class="legend-dots"><span><i class="dot pend"></i>Pending</span><span><i class="dot W"></i>Win</span><span><i class="dot L"></i>Loss</span><button class="btn small" id="todayBtn">Jump to today</button></div>
+    </div>
+    <div class="strip" id="strip"></div>
+  </section>
+
+  <section id="day"></section>
+
+  <section>
+    <div class="sec-h"><h2>Trophy case</h2><small>Updates as games are graded</small></div>
+    <div class="trophies" id="trophies"></div>
+  </section>
+</div>
+
+<!-- Pick sheet -->
+<div class="scrim" id="pickScrim" hidden>
+  <form class="sheet" id="pickForm" novalidate>
+    <h3 id="pfTitle">Make your pick</h3>
+    <div class="lead" id="pfLead"></div>
+    <label class="field" id="pfPlayerWrap"><span>Player</span><select id="pfPlayer"></select></label>
+    <div class="at">
+      <label class="field"><span>Away</span><input id="pfAway" list="teams" autocomplete="off" placeholder="Clemson"></label>
+      <span class="atsym">@</span>
+      <label class="field"><span>Home</span><input id="pfHome" list="teams" autocomplete="off" placeholder="Virginia"></label>
+    </div>
+    <div class="field"><span class="flabel">Bet</span>
+      <div class="seg" id="pfType"><button type="button" data-v="spread">Spread</button><button type="button" data-v="total">Over / Under</button></div>
+    </div>
+    <div class="field"><span class="flabel" id="pfSideLbl">Side</span><div class="seg" id="pfSide"></div></div>
+    <div class="field"><span class="flabel" id="pfLineLbl">Line</span>
+      <div class="stepper"><button type="button" id="lineDown" aria-label="Lower the line by half a point">−</button><input id="pfLine" type="number" step="0.5" inputmode="decimal" aria-label="Line"><button type="button" id="lineUp" aria-label="Raise the line by half a point">+</button></div>
+      <div class="hint" id="pfHint"></div>
+    </div>
+    <div class="slip"><div><div class="s1" id="slip1">—</div><div class="s2" id="slip2"></div></div><span id="slipChip"></span></div>
+    <details class="final" id="pfFinal">
+      <summary>Final score &amp; grading</summary>
+      <div class="inner">
+        <div class="row2">
+          <label class="field"><span id="pfAwaySLbl">Away</span><input id="pfAwayS" type="number" min="0" inputmode="numeric" placeholder="—"></label>
+          <label class="field"><span id="pfHomeSLbl">Home</span><input id="pfHomeS" type="number" min="0" inputmode="numeric" placeholder="—"></label>
+        </div>
+        <label class="field"><span>Result</span>
+          <select id="pfManual"><option value="">Grade automatically from the score</option><option value="W">Win</option><option value="L">Loss</option><option value="P">Push</option></select>
+        </label>
+      </div>
+    </details>
+    <div class="err" id="pfErr" hidden></div>
+    <div class="sheet-acts">
+      <button type="button" class="btn danger small" id="pfDel" hidden>Delete</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn" id="pfCancel">Cancel</button>
+      <button type="submit" class="btn gold" id="pfSave">Lock it in</button>
+    </div>
+  </form>
+</div>
+
+<!-- Settings sheet -->
+<div class="scrim" id="setScrim" hidden>
+  <form class="sheet" id="setForm" novalidate>
+    <h3>League settings</h3>
+    <div class="lead">Names and Day 1 are shared with everyone in the league.</div>
+    <div id="setNames" style="display:flex;flex-direction:column;gap:10px"></div>
+    <label class="field"><span>Day 1</span><input id="setStart" type="date"></label>
+    <div class="hint">Picks are stored by day number, so moving Day 1 moves every saved pick with it.</div>
+    <div class="sheet-acts"><span class="spacer"></span><button type="button" class="btn" id="setCancel">Cancel</button><button type="submit" class="btn primary">Save</button></div>
+  </form>
+</div>
+
+<datalist id="teams"></datalist>
+<canvas id="confetti" hidden></canvas>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const DAYS = 44;
+const DEFAULTS = { players:["Ellis","Frankie","Blake","Carter"], startDate:"2026-10-17", offDays:[] };
+const TEAMS = "Air Force,Akron,Alabama,App State,Arizona,Arizona State,Arkansas,Arkansas State,Army,Auburn,Ball State,Baylor,Boise State,Boston College,Bowling Green,Buffalo,BYU,California,Central Michigan,Charlotte,Cincinnati,Clemson,Coastal Carolina,Colorado,Colorado State,Delaware,Duke,East Carolina,Eastern Michigan,FIU,Florida,Florida Atlantic,Florida State,Fresno State,Georgia,Georgia Southern,Georgia State,Georgia Tech,Hawaii,Houston,Illinois,Indiana,Iowa,Iowa State,Jacksonville State,James Madison,Kansas,Kansas State,Kennesaw State,Kent State,Kentucky,Liberty,Louisiana,Louisiana Tech,Louisville,LSU,Marshall,Maryland,Memphis,Miami (FL),Miami (OH),Michigan,Michigan State,Middle Tennessee,Minnesota,Mississippi State,Missouri,Missouri State,Navy,NC State,Nebraska,Nevada,New Mexico,New Mexico State,North Carolina,North Texas,Northern Illinois,Northwestern,Notre Dame,Ohio,Ohio State,Oklahoma,Oklahoma State,Old Dominion,Ole Miss,Oregon,Oregon State,Penn State,Pittsburgh,Purdue,Rice,Rutgers,Sacramento State,Sam Houston,San Diego State,San Jose State,SMU,South Alabama,South Carolina,South Florida,Southern Miss,Stanford,Syracuse,TCU,Temple,Tennessee,Texas,Texas A&M,Texas State,Texas Tech,Toledo,Troy,Tulane,Tulsa,UAB,UCF,UCLA,UConn,ULM,UMass,UNLV,USC,Utah,Utah State,UTEP,UTSA,Vanderbilt,Virginia,Virginia Tech,Wake Forest,Washington,Washington State,West Virginia,Western Kentucky,Western Michigan,Wisconsin,Wyoming".split(",");
+const WIN_UNITS = 100/110;
+
+let S = structuredClone(DEFAULTS), P = {};
+let db = null, canWrite = true, ready = false, offline = false, version = null;
+let selDay = 0;
+let me = lsGet("me") || null;
+
+const $ = id => document.getElementById(id);
+function lsGet(k){ try { return localStorage.getItem(k); } catch(e){ return null; } }
+function lsSet(k,v){ try { v==null ? localStorage.removeItem(k) : localStorage.setItem(k,v); } catch(e){} }
+function esc(s){ return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+const icon = (id,cls="") => `<svg class="ico ${cls}" aria-hidden="true"><use href="#i-${id}"/></svg>`;
+function toast(msg){ const t=$("toast"); t.textContent=msg; t.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>t.hidden=true,2400); }
+const initials = name => (name||"?").trim().split(/\s+/).map(w=>w[0]).join("").slice(0,2).toUpperCase();
+const avatar = (slot, cls="") => `<span class="av ${cls}" style="--c:var(--p${slot})" title="${esc(S.players[slot])}">${esc(initials(S.players[slot]))}</span>`;
+
+/* ---------- dates ---------- */
+function parseD(s){ const [y,m,d]=(s||DEFAULTS.startDate).split("-").map(Number); return new Date(y,m-1,d); }
+function dayDate(i){ const d=parseD(S.startDate); d.setDate(d.getDate()+i); return d; }
+function todayIdx(){ const t=new Date(); t.setHours(0,0,0,0); return Math.round((t-parseD(S.startDate))/864e5); }
+const fmtW = d => d.toLocaleDateString(undefined,{weekday:"short"});
+const fmtMD = d => d.toLocaleDateString(undefined,{month:"short",day:"numeric"});
+const fmtLong = d => d.toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"});
+
+/* ---------- picks & grading ---------- */
+const pid = (day,slot) => `d${String(day).padStart(2,"0")}-p${slot}`;
+const getPick = (day,slot) => P[pid(day,slot)] || null;
+const isOff = day => (S.offDays||[]).includes(day);
+const num = v => (v===""||v===null||v===undefined||isNaN(Number(v))) ? null : Number(v);
+const fmtLine = l => { l=Number(l); return l===0 ? "PK" : (l>0?"+":"")+l; };
+const RES = {W:"Win",L:"Loss",P:"Push"};
+
+function pickLabel(p){
+  if(!p) return "";
+  if(p.type==="total") return `${p.side==="over"?"Over":"Under"} ${p.line}`;
+  return `${p.side==="home"?p.home:p.away} ${fmtLine(p.line)}`;
+}
+function grade(p){
+  const a=num(p.awayScore), h=num(p.homeScore), line=num(p.line);
+  if(a===null||h===null||line===null) return null;
+  let m;
+  if(p.type==="total"){ const sum=a+h; m = p.side==="over" ? sum-line : line-sum; }
+  else { const mine=p.side==="home"?h:a, opp=p.side==="home"?a:h; m = mine+line-opp; }
+  return m>0?"W":m<0?"L":"P";
+}
+const result = p => p ? (p.manual || grade(p)) : null;
+const gameKey = p => `${(p.away||"").trim().toLowerCase()}@${(p.home||"").trim().toLowerCase()}`;
+
+/* ---------- derived stats ---------- */
+function runs(seq, ch){ let best=0,cur=0; for(const r of seq){ if(r===ch){cur++; best=Math.max(best,cur);} else if(r!=="P") cur=0; } return best; }
+function playerStats(slot){
+  const t=todayIdx();
+  const list=[];
+  for(let d=0; d<DAYS; d++){ const p=getPick(d,slot); if(p) list.push({d,p,r:result(p)}); }
+  const graded=list.filter(x=>x.r);
+  const seq=graded.map(x=>x.r);
+  let w=0,l=0,pu=0; seq.forEach(r=>{ if(r==="W")w++; else if(r==="L")l++; else pu++; });
+  const wl=seq.filter(r=>r!=="P");
+  let streakType=null, streakLen=0;
+  if(wl.length){ streakType=wl[wl.length-1]; for(let i=wl.length-1;i>=0&&wl[i]===streakType;i--) streakLen++; }
+  const rec = f => { let a=0,b=0; graded.filter(x=>f(x.p)).forEach(x=>{ if(x.r==="W")a++; else if(x.r==="L")b++; }); return {w:a,l:b}; };
+  let due=0; for(let d=0; d<=Math.min(t,DAYS-1); d++) if(!isOff(d)) due++;
+  const series=[]; let cum=0;
+  for(let d=0; d<=Math.min(t,DAYS-1); d++){ const p=getPick(d,slot), r=result(p); if(r==="W") cum+=WIN_UNITS; else if(r==="L") cum-=1; series.push(cum); }
+  return {
+    slot, name:S.players[slot], w,l,pu, made:list.length, due,
+    pct:(w+l)?w/(w+l):null, units:w*WIN_UNITS-l,
+    streakType, streakLen, longestW:runs(seq,"W"), longestL:runs(seq,"L"),
+    form:seq.slice(-5),
+    spread:rec(p=>p.type==="spread"), total:rec(p=>p.type==="total"),
+    dogs:rec(p=>p.type==="spread"&&Number(p.line)>0),
+    favCount:list.filter(x=>x.p.type==="spread"&&Number(x.p.line)<0).length,
+    overCount:list.filter(x=>x.p.type==="total"&&x.p.side==="over").length,
+    underCount:list.filter(x=>x.p.type==="total"&&x.p.side==="under").length,
+    series
+  };
+}
+function dayResults(d){ return S.players.map((_,s)=>result(getPick(d,s))); }
+const isPerfect = d => { const r=dayResults(d); return r.every(x=>x==="W"); };
+
+/* ---------- renderers ---------- */
+let ST = [];
+function renderHeader(){
+  const t=todayIdx();
+  let gw=0,gl=0,gp=0; ST.forEach(s=>{gw+=s.w; gl+=s.l; gp+=s.pu;});
+  const perfect = Array.from({length:DAYS},(_,d)=>d).filter(isPerfect).length;
+  const heat = ST.filter(s=>s.streakType==="W"&&s.streakLen>=3).length;
+  const dayTxt = t<0 ? `Starts in ${-t}` : t>=DAYS ? "Final" : `${t+1}<span style="font-size:.55em;opacity:.6"> / ${DAYS}</span>`;
+  $("meta").innerHTML = `
+    <div class="stat"><b>${dayTxt}</b><small>${t<0?"Days to kickoff":t>=DAYS?"All 44 days done":"Day"}</small></div>
+    <div class="stat"><b class="num">${gw}-${gl}${gp?`-${gp}`:""}</b><small>League record</small></div>
+    <div class="stat"><b>${perfect}</b><small>Perfect days</small></div>
+    <div class="stat"><b style="color:var(--fire)">${heat}</b><small>On a heater</small></div>`;
+  $("progress").innerHTML = Array.from({length:DAYS},(_,d)=>`<i class="${d===t?"now":isOff(d)?"off":d<t?"done":""}"></i>`).join("");
+  $("meSel").innerHTML = `<option value="">Who are you?</option>` + S.players.map((p,i)=>`<option value="${i}" ${String(i)===me?"selected":""}>${esc(p)}</option>`).join("");
+}
+
+function renderBanner(){
+  const b=$("banner");
+  if(offline){ b.hidden=false; b.textContent = ready ? "Can't reach the server. Retrying…" : "Can't reach the server. Check your connection; it'll keep retrying."; return; }
+  if(!ready){ b.hidden=false; b.textContent="Loading the league…"; return; }
+    if(me===null){
+    b.hidden=false;
+    b.innerHTML = `<b>Who's on this device?</b><div class="whoami">${S.players.map((p,i)=>`<button type="button" data-me="${i}">${avatar(i)}${esc(p)}</button>`).join("")}</div>`;
+    return;
+  }
+  b.hidden=true;
+}
+
+function renderHero(){
+  const h=$("hero"); const t=todayIdx();
+  if(me===null || !ready || t<0 || t>=DAYS){ h.hidden=true; return; }
+  const slot=Number(me), p=getPick(t,slot), r=result(p), off=isOff(t);
+  const inSlots=S.players.map((_,s)=>s).filter(s=>getPick(t,s));
+  const waiting=S.players.map((_,s)=>s).filter(s=>!getPick(t,s));
+  const roll = `<div class="who-in">${S.players.map((_,s)=>avatar(s, getPick(t,s)?"":"ghosted")).join("")}<span>${off?"No-games day":inSlots.length===S.players.length?"Everyone's in":`${inSlots.length} of ${S.players.length} in · waiting on ${waiting.map(s=>esc(S.players[s])).join(", ")}`}</span></div>`;
+  let k=`Day ${t+1} · ${esc(fmtLong(dayDate(t)))}`, big, sub, btn="", need=false;
+  if(off){ big="Day off"; sub="Marked as a no-games day. Nothing to pick."; }
+  else if(!p){ need=true; big="Your pick's not in"; sub="Spread or total, any game on today's slate."; btn=`<button class="btn gold" data-edit="${slot}" data-day="${t}" ${canWrite&&db?"":"disabled"}>Make today's pick</button>`; }
+  else if(!r){ big=esc(pickLabel(p)); sub=`${esc(p.away)} @ ${esc(p.home)} · pending`; btn=`<button class="btn" data-edit="${slot}" data-day="${t}" ${canWrite&&db?"":"disabled"}>Enter final score</button>`; }
+  else { big=esc(pickLabel(p)); sub=`${esc(p.away)} ${p.awayScore??""} – ${esc(p.home)} ${p.homeScore??""} · ${r==="W"?"Cashed":r==="L"?"Didn't hit":"Push"}`; btn=`<span class="chip ${r}">${RES[r]}</span>`; }
+  h.hidden=false;
+  h.className = "hero" + (need?" need":"");
+  h.innerHTML = `<div><div class="k">${k}</div><div class="big">${big}</div><div class="sub">${sub}</div>${roll}</div><div>${btn}</div>`;
+}
+
+function streakChip(s){
+  if(!s.streakType) return `<span class="chip none">—</span>`;
+  if(s.streakType==="W" && s.streakLen>=3) return `<span class="chip fire">${icon("fire")} W${s.streakLen}</span>`;
+  if(s.streakType==="L" && s.streakLen>=3) return `<span class="chip ice">${icon("ice")} L${s.streakLen}</span>`;
+  return `<span class="chip ${s.streakType}">${s.streakType}${s.streakLen}</span>`;
+}
+function renderStandings(){
+  const rows=[...ST].sort((a,b)=> b.units-a.units || (b.w-b.l)-(a.w-a.l) || b.w-a.w || a.slot-b.slot);
+  const anyGraded = rows.some(r=>r.w+r.l+r.pu>0);
+  $("standings").innerHTML = rows.map((r,i)=>{
+    const flame = r.streakType==="W"&&r.streakLen>=3 ? `<span style="color:var(--fire)" title="On a heater">${icon("fire")}</span>` : r.streakType==="L"&&r.streakLen>=3 ? `<span style="color:var(--ice)" title="Ice cold">${icon("ice")}</span>` : "";
+    const form = Array.from({length:5},(_,k)=>{ const x=r.form[r.form.length-5+k]; return x?`<i class="${x}">${x}</i>`:`<i class="e"></i>`; }).join("");
+    return `<tr class="${anyGraded&&i===0?"lead":""}">
+      <td class="rank">${i+1}</td>
+      <td><div class="pl">${avatar(r.slot)}<div><div class="nm">${esc(r.name)}${flame}${String(r.slot)===me?`<span class="you">You</span>`:""}</div><div class="sm">${r.made}/${r.due} picks in</div></div></div></td>
+      <td><span class="rec num">${r.w}-${r.l}${r.pu?`-${r.pu}`:""}</span><small>${r.pct===null?"—":(r.pct*100).toFixed(1)+"%"}</small></td>
+      <td class="r num units ${r.units>0.001?"pos":r.units<-0.001?"neg":""}">${r.units>0.001?"+":""}${r.units.toFixed(2)}u</td>
+      <td><span class="form">${form}</span></td>
+      <td>${streakChip(r)}</td>
+    </tr>`;
+  }).join("");
+}
+
+function niceStep(raw){ const p=Math.pow(10,Math.floor(Math.log10(raw))); const f=raw/p; return (f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*p; }
+function renderRace(){
+  const el=$("race"); const t=todayIdx();
+  const graded = ST.some(s=>s.w+s.l>0);
+  if(!graded || t<0){ el.innerHTML=`<div class="chart-empty">The race starts once the first game is graded. Enter a final score on any pick and the lines start moving.</div>`; return; }
+  const n=ST[0].series.length;
+  const W=Math.max(320, Math.min(el.clientWidth-28, 940)), H=Math.round(Math.min(260, Math.max(190, W*.36)));
+  const pl=40, pr=14, pt=12, pb=26;
+  const all=ST.flatMap(s=>s.series).concat([0]);
+  let lo=Math.min(...all), hi=Math.max(...all); if(hi-lo<2){ hi+=1; lo-=1; }
+  const step=niceStep((hi-lo)/4); lo=Math.floor(lo/step)*step; hi=Math.ceil(hi/step)*step;
+  const x=i=> pl + (n<=1?0:(i/(n-1))*(W-pl-pr));
+  const y=v=> pt + (hi-v)/(hi-lo)*(H-pt-pb);
+  let g="";
+  for(let v=lo; v<=hi+1e-9; v+=step){ const yy=y(v).toFixed(1); g+=`<line x1="${pl}" x2="${W-pr}" y1="${yy}" y2="${yy}" stroke="var(--line)" stroke-width="${Math.abs(v)<1e-9?1.5:1}" ${Math.abs(v)<1e-9?"":"stroke-dasharray='2 4'"}/><text x="${pl-8}" y="${(+yy+4)}" text-anchor="end" font-size="11" fill="var(--muted)" font-family="var(--mono)">${v>0?"+":""}${+v.toFixed(1)}</text>`; }
+  const tickEvery = n>30?7:n>14?5:n>7?2:1;
+  for(let i=0;i<n;i+=tickEvery){ g+=`<text x="${x(i).toFixed(1)}" y="${H-6}" text-anchor="middle" font-size="11" fill="var(--muted)" font-family="var(--mono)">D${i+1}</text>`; }
+  const order=[...ST].sort((a,b)=>a.series[n-1]-b.series[n-1]);
+  const lines = order.map(s=>{
+    const d=s.series.map((v,i)=>`${i?"L":"M"}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(" ");
+    const lx=x(n-1), ly=y(s.series[n-1]);
+    const mine=String(s.slot)===me;
+    return `<path d="${d}" fill="none" stroke="var(--p${s.slot})" stroke-width="${mine?3.5:2.25}" stroke-linejoin="round" stroke-linecap="round" opacity="${me===null||mine?1:.8}"/><circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="${mine?5:4}" fill="var(--p${s.slot})" stroke="var(--surface)" stroke-width="2"/>`;
+  }).join("");
+  const legend=[...ST].sort((a,b)=>b.units-a.units).map(s=>`<span style="--c:var(--p${s.slot})"><i></i>${esc(s.name)} <b class="num ${s.units>0.001?"pos":s.units<-0.001?"neg":""}">${s.units>0.001?"+":""}${s.units.toFixed(2)}</b></span>`).join("");
+  el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Running units by day for each player">${g}${lines}</svg><div class="legend">${legend}</div>`;
+}
+
+function renderStrip(scroll){
+  const t=todayIdx();
+  $("strip").innerHTML = Array.from({length:DAYS},(_,d)=>{
+    const dt=dayDate(d);
+    const dots = isOff(d) ? `<span class="off">NO GAMES</span>` :
+      `<span class="dots">${S.players.map((_,s)=>{ const p=getPick(d,s); return `<span class="dot ${p?(result(p)||"pend"):""}"></span>`; }).join("")}</span>`;
+    return `<button class="dbtn ${d===t?"today":""} ${d===selDay?"sel":""} ${isPerfect(d)?"perfect":""}" data-day="${d}" aria-label="Day ${d+1}, ${esc(fmtLong(dt))}">
+      <span class="dw">${fmtW(dt)}</span><span class="dn">${d+1}</span><span class="dw">${fmtMD(dt)}</span>${dots}</button>`;
+  }).join("");
+  if(scroll){ const el=$("strip").querySelector(".sel"); el && el.scrollIntoView({inline:"center",block:"nearest",behavior:"auto"}); }
+}
+
+function renderDay(){
+  const d=selDay, dt=dayDate(d), t=todayIdx(), off=isOff(d);
+  const when = d===t?"Today":d<t?`${t-d} day${t-d>1?"s":""} ago`:`In ${d-t} day${d-t>1?"s":""}`;
+  const allow = db && canWrite && ready;
+  const picks = S.players.map((_,s)=>getPick(d,s));
+  let body;
+  if(off){
+    body=`<div class="offnote">No college football on this day. It doesn't count toward anyone's picks or streaks.</div>`;
+  } else {
+    const slots = S.players.map((_,s)=>s);
+    if(me!==null){ const m=Number(me); slots.splice(slots.indexOf(m),1); slots.unshift(m); }
+    body=`<div class="cards">${slots.map(s=>{
+      const name=S.players[s], p=picks[s], r=result(p);
+      let chip, inner, tags="";
+      if(p){
+        chip = r ? `<span class="chip ${r}">${RES[r]}</span>` : `<span class="chip pend">Pending</span>`;
+        const sc = (num(p.awayScore)!==null&&num(p.homeScore)!==null) ? `<div class="score">${esc(p.away)} ${p.awayScore} · ${esc(p.home)} ${p.homeScore}</div>` : "";
+        const tl = picks.map((q,o)=>{ if(o===s||!q||q.type!==p.type||gameKey(q)!==gameKey(p)) return ""; return q.side===p.side ? `<span class="tag tail">Same as ${esc(S.players[o])}</span>` : `<span class="tag fade">Fading ${esc(S.players[o])}</span>`; }).join("");
+        tags = tl ? `<div class="tags">${tl}</div>` : "";
+        inner=`<div class="pick">${esc(pickLabel(p))}</div><div class="game">${esc(p.away)} @ ${esc(p.home)} · ${p.type==="total"?"total":"spread"}</div>${sc}${tags}`;
+      } else {
+        chip = d<t ? `<span class="chip miss">Missed</span>` : `<span class="chip none">No pick</span>`;
+        inner = `<div class="empty">${d<t?"Nothing entered for this day.":d===t?"On the clock.":"Picks open any time."}</div>`;
+      }
+      const act = p
+        ? `<button class="btn small" data-edit="${s}" ${allow?"":"disabled"}>${r?"Edit":"Enter final"}</button>`
+        : `<button class="btn small ${String(s)===me?"gold":"primary"}" data-edit="${s}" ${allow?"":"disabled"}>Make pick</button>`;
+      return `<article class="card ${String(s)===me?"me":""} ${r||""}"><div class="top"><span class="who">${avatar(s)}<span>${esc(name)}</span></span>${chip}</div>${inner}<div class="acts">${act}</div></article>`;
+    }).join("")}</div>`;
+  }
+  const perfect = !off && isPerfect(d) ? ` · <b style="color:var(--accent)">Perfect day, ${S.players.length} for ${S.players.length}</b>` : "";
+  $("day").innerHTML=`
+    <div class="dayhead">
+      <div><h2>Day ${d+1} · ${esc(fmtLong(dt))}</h2><div class="sub">${when}${perfect}</div></div>
+      <button class="btn small" id="offBtn" ${allow?"":"disabled"}>${off?"There are games today":"No games this day"}</button>
+    </div>${body}`;
+}
+
+function renderTrophies(){
+  const best = (arr, val, ok=()=>true) => { const c=arr.filter(ok); if(!c.length) return null; const m=Math.max(...c.map(val)); if(m<=0) return null; return c.filter(x=>val(x)===m); };
+  const pctOf = r => (r.w+r.l) ? r.w/(r.w+r.l) : -1;
+  const names = list => list.map(s=>esc(s.name)).join(" & ");
+  const T = [];
+  const add = (title, ico, winners, value, desc) => T.push({title,ico,winners,value,desc});
+  let w;
+  w=best(ST,s=>s.longestW); add("Longest heater","fire",w,w&&`W${w[0].longestW}`,"Most wins in a row");
+  w=best(ST,s=>s.longestL); add("Ice box","ice",w,w&&`L${w[0].longestL}`,"Longest losing skid");
+  w=best(ST,s=>pctOf(s.spread)*1000+s.spread.w,s=>s.spread.w+s.spread.l>=3); add("Spread sniper","trophy",w,w&&`${w[0].spread.w}-${w[0].spread.l}`,"Best ATS record, 3+ graded");
+  w=best(ST,s=>pctOf(s.total)*1000+s.total.w,s=>s.total.w+s.total.l>=3); add("Totals guru","trophy",w,w&&`${w[0].total.w}-${w[0].total.l}`,"Best over/under record, 3+ graded");
+  w=best(ST,s=>s.dogs.w); add("Dog whisperer","trophy",w,w&&`${w[0].dogs.w}-${w[0].dogs.l}`,"Most wins taking points");
+  w=best(ST,s=>s.favCount); add("Chalk eater","trophy",w,w&&`${w[0].favCount}`,"Most favorites laid");
+  w=best(ST,s=>s.overCount); add("Over merchant","trophy",w,w&&`${w[0].overCount}`,"Most overs taken");
+  w=best(ST,s=>s.underCount); add("Under lover","trophy",w,w&&`${w[0].underCount}`,"Most unders taken");
+  $("trophies").innerHTML = T.map(x=>`<div class="trophy ${x.winners?"":"vacant"}">
+    <div class="t">${icon(x.ico)}${x.title}</div>
+    <div class="w">${x.winners? x.winners.map(s=>avatar(s.slot)).join("")+`<span>${names(x.winners)}</span>` : "Up for grabs"}</div>
+    ${x.winners?`<div class="v num">${x.value}</div>`:""}
+    <div class="d">${x.desc}</div></div>`).join("");
+}
+
+function renderAll(scroll){
+  ST = S.players.map((_,s)=>playerStats(s));
+  renderHeader(); renderBanner(); renderHero(); renderStandings(); renderRace(); renderStrip(scroll); renderDay(); renderTrophies();
+}
+
+/* ---------- pick sheet ---------- */
+let form=null;
+function openPick(day, slot){
+  const p=getPick(day,slot);
+  form={ day, slot, editing:!!p, type:p?.type||"spread", side:p?.side||null, prevResult:result(p) };
+  $("pfTitle").textContent = p ? (result(p)?"Edit pick":"Grade or edit") : (String(slot)===me?"Make your pick":`Pick for ${S.players[slot]}`);
+  $("pfLead").textContent = `Day ${day+1} · ${fmtLong(dayDate(day))}`;
+  $("pfPlayer").innerHTML = S.players.map((nm,i)=>`<option value="${i}" ${i===slot?"selected":""}>${esc(nm)}</option>`).join("");
+  $("pfPlayerWrap").hidden = !!p || String(slot)===me;
+  $("pfAway").value=p?.away||""; $("pfHome").value=p?.home||"";
+  $("pfLine").value=p?.line ?? "";
+  $("pfAwayS").value=p?.awayScore ?? ""; $("pfHomeS").value=p?.homeScore ?? "";
+  $("pfManual").value=p?.manual || "";
+  $("pfFinal").open = !!p;
+  $("pfDel").hidden=!p; delete $("pfDel").dataset.armed; $("pfDel").textContent="Delete";
+  $("pfSave").textContent = p ? "Save" : "Lock it in";
+  $("pfErr").hidden=true;
+  syncForm();
+  $("pickScrim").hidden=false;
+  setTimeout(()=>{ (p? $("pfAwayS") : $("pfAway")).focus({preventScroll:true}); },60);
+}
+function draft(){
+  return { type:form.type, side:form.side, away:$("pfAway").value.trim()||"Away", home:$("pfHome").value.trim()||"Home",
+    line:$("pfLine").value, awayScore:$("pfAwayS").value, homeScore:$("pfHomeS").value, manual:$("pfManual").value||null };
+}
+function syncForm(){
+  const dr=draft();
+  [...$("pfType").children].forEach(b=>b.setAttribute("aria-pressed", String(b.dataset.v===form.type)));
+  const opts = form.type==="total" ? [["over","Over"],["under","Under"]] : [["away",dr.away],["home",dr.home]];
+  if(!opts.some(o=>o[0]===form.side)) form.side=null;
+  $("pfSide").innerHTML = opts.map(([v,l])=>`<button type="button" data-v="${v}" aria-pressed="${form.side===v}">${esc(l)}</button>`).join("");
+  $("pfSideLbl").textContent = form.type==="total"?"Over or under":"Who you're taking";
+  $("pfLineLbl").textContent = form.type==="total"?"Total points":"Their spread";
+  $("pfLine").placeholder = form.type==="total"?"54.5":"-3.5";
+  $("pfHint").textContent = form.type==="total" ? "Combined points scored by both teams." : "Negative if they're favored (−7.5). Positive if they're getting points (+7.5).";
+  $("pfAwaySLbl").textContent=dr.away; $("pfHomeSLbl").textContent=dr.home;
+  dr.side=form.side;
+  const ok = form.side && num(dr.line)!==null;
+  const r = ok ? (dr.manual || grade(dr)) : null;
+  $("slip1").textContent = ok ? pickLabel(dr) : (form.side ? "Add the line" : "Pick a side");
+  $("slip2").textContent = `${dr.away} @ ${dr.home}`;
+  $("slipChip").innerHTML = r ? `<span class="chip ${r}">${RES[r]}</span>` : "";
+}
+function closeSheets(){ $("pickScrim").hidden=true; $("setScrim").hidden=true; form=null; }
+function bumpLine(dlt){ const v=num($("pfLine").value); $("pfLine").value = String((v===null?(form.type==="total"?50:0):v)+dlt); syncForm(); }
+
+async function savePick(e){
+  e.preventDefault();
+  const away=$("pfAway").value.trim(), home=$("pfHome").value.trim(), line=num($("pfLine").value);
+  const err = !away||!home ? "Enter both teams." : !form.side ? "Choose a side." : line===null ? "Enter the line." : (form.type==="total"&&line<=0) ? "A total needs to be above zero." : null;
+  if(err){ $("pfErr").textContent=err; $("pfErr").hidden=false; return; }
+  const slot = form.editing ? form.slot : Number($("pfPlayer").value);
+  if(!form.editing && getPick(form.day,slot)){ $("pfErr").textContent=`${S.players[slot]} already has a pick for this day. Edit that one instead.`; $("pfErr").hidden=false; return; }
+  const doc={ day:form.day, slot, type:form.type, side:form.side, away, home, line,
+    awayScore:num($("pfAwayS").value), homeScore:num($("pfHomeS").value), manual:$("pfManual").value||null, updatedAt:Date.now() };
+  const newR=result(doc), prevR=form.prevResult, wasEditing=form.editing;
+  $("pfSave").disabled=true;
+  try{
+    await db.doc("picks/"+pid(form.day,slot)).set(doc);
+    closeSheets();
+    if(newR && newR!==prevR){
+      if(newR==="W"){ toast(`${S.players[slot]} cashes it`); confetti(); }
+      else if(newR==="L") toast("Tough beat. Graded as a loss.");
+      else toast("Push. Nobody gets hurt.");
+    } else toast(wasEditing ? "Pick updated" : "Pick locked in");
+  } catch(x){
+    $("pfErr").textContent = x?.code==="bad_request" ? x.message : "Couldn't save. Check your connection and try again.";
+    $("pfErr").hidden=false;
+  } finally { $("pfSave").disabled=false; }
+}
+async function deletePick(){
+  const b=$("pfDel");
+  if(!b.dataset.armed){ b.dataset.armed="1"; b.textContent="Tap again to delete"; return; }
+  try{ await db.doc("picks/"+pid(form.day,form.slot)).delete(); closeSheets(); toast("Pick deleted"); }
+  catch(x){ $("pfErr").textContent="Couldn't delete the pick. Try again."; $("pfErr").hidden=false; }
+}
+
+/* ---------- settings ---------- */
+function openSettings(){
+  $("setNames").innerHTML = S.players.map((p,i)=>`<label class="field"><span>Player ${i+1}</span><input id="setName${i}" value="${esc(p)}" maxlength="20"></label>`).join("");
+  $("setStart").value=S.startDate;
+  $("setScrim").hidden=false;
+}
+async function saveSettings(e){
+  e.preventDefault();
+  if(!db||!canWrite){ toast("Settings can't be saved in this view"); return; }
+  const players=S.players.map((p,i)=>$("setName"+i).value.trim()||`Player ${i+1}`);
+  const startDate=$("setStart").value||S.startDate;
+  try{ await db.doc("league/settings").set({ players, startDate, offDays:S.offDays||[] }); closeSheets(); toast("Settings saved"); }
+  catch(x){ toast("Couldn't save settings"); }
+}
+async function toggleOff(){
+  const off=new Set(S.offDays||[]); off.has(selDay)?off.delete(selDay):off.add(selDay);
+  try{ await db.doc("league/settings").set({ players:S.players, startDate:S.startDate, offDays:[...off].sort((a,b)=>a-b) }); }
+  catch(x){ toast("Couldn't update that day"); }
+}
+
+/* ---------- confetti ---------- */
+function confetti(){
+  if(matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const c=$("confetti"), ctx=c.getContext("2d"); c.hidden=false;
+  const dpr=Math.min(devicePixelRatio||1,2); c.width=innerWidth*dpr; c.height=innerHeight*dpr; ctx.scale(dpr,dpr);
+  const cs=getComputedStyle(document.documentElement);
+  const cols=["--accent","--win","--p0","--p1","--p2","--p3","--p4"].map(v=>cs.getPropertyValue(v).trim()||"#C98A06");
+  const parts=Array.from({length:140},()=>({x:innerWidth/2+(Math.random()-.5)*120,y:innerHeight*.35,vx:(Math.random()-.5)*14,vy:-Math.random()*13-4,s:Math.random()*7+4,r:Math.random()*6,vr:(Math.random()-.5)*.4,c:cols[(Math.random()*cols.length)|0]}));
+  const t0=performance.now();
+  (function frame(now){
+    const el=now-t0; ctx.clearRect(0,0,innerWidth,innerHeight);
+    parts.forEach(p=>{ p.vy+=.38; p.vx*=.99; p.x+=p.vx; p.y+=p.vy; p.r+=p.vr; ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.r); ctx.globalAlpha=Math.max(0,1-el/1900); ctx.fillStyle=p.c; ctx.fillRect(-p.s/2,-p.s/4,p.s,p.s/2); ctx.restore(); });
+    if(el<1900) requestAnimationFrame(frame); else { ctx.clearRect(0,0,innerWidth,innerHeight); c.hidden=true; ctx.setTransform(1,0,0,1,0,0); }
+  })(t0);
+}
+
+/* ---------- events ---------- */
+$("strip").addEventListener("click",e=>{ const b=e.target.closest("[data-day]"); if(!b) return; selDay=Number(b.dataset.day); renderStrip(false); renderDay(); });
+$("todayBtn").addEventListener("click",()=>{ selDay=Math.min(Math.max(todayIdx(),0),DAYS-1); renderStrip(true); renderDay(); $("day").scrollIntoView({behavior:"smooth",block:"start"}); });
+document.addEventListener("click",e=>{
+  const ed=e.target.closest("[data-edit]");
+  if(ed && !ed.disabled){ const day = ed.dataset.day!==undefined ? Number(ed.dataset.day) : selDay; openPick(day, Number(ed.dataset.edit)); return; }
+  const m=e.target.closest("[data-me]"); if(m){ me=m.dataset.me; lsSet("me",me); renderAll(); return; }
+  if(e.target.id==="offBtn") toggleOff();
+});
+$("meSel").addEventListener("change",e=>{ me=e.target.value===""?null:e.target.value; lsSet("me",me); renderAll(); });
+$("setBtn").addEventListener("click",openSettings);
+$("pfType").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b) return; if(form.type!==b.dataset.v){ form.type=b.dataset.v; form.side=null; $("pfLine").value=""; } syncForm(); });
+$("pfSide").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b) return; form.side=b.dataset.v; syncForm(); });
+$("lineDown").addEventListener("click",()=>bumpLine(-.5));
+$("lineUp").addEventListener("click",()=>bumpLine(.5));
+["pfAway","pfHome","pfLine","pfAwayS","pfHomeS","pfManual"].forEach(id=>$(id).addEventListener("input",syncForm));
+$("pickForm").addEventListener("submit",savePick);
+$("pfDel").addEventListener("click",deletePick);
+$("pfCancel").addEventListener("click",closeSheets);
+$("setForm").addEventListener("submit",saveSettings);
+$("setCancel").addEventListener("click",closeSheets);
+document.querySelectorAll(".scrim").forEach(s=>s.addEventListener("click",e=>{ if(e.target===s) closeSheets(); }));
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeSheets(); });
+let rz; addEventListener("resize",()=>{ clearTimeout(rz); rz=setTimeout(renderRace,150); });
+$("teams").innerHTML = TEAMS.map(t=>`<option value="${esc(t)}"></option>`).join("");
+
+/* ---------- boot ---------- */
+selDay=Math.min(Math.max(todayIdx(),0),DAYS-1);
+renderAll(true);
+
+/* ---------- server sync: Vercel KV behind /api, polled every few seconds ---------- */
+async function api(method, path, body){
+  const r = await fetch(path, { method, cache:"no-store", headers: body ? {"Content-Type":"application/json"} : undefined, body: body ? JSON.stringify(body) : undefined });
+  const j = await r.json().catch(()=>({}));
+  if(!r.ok){ const e=new Error(j.error||"Request failed"); e.code = r.status===400 ? "bad_request" : "unavailable"; throw e; }
+  return j;
+}
+function applyState(j){
+  version = j.version;
+  const d = j.settings || {};
+  const players = Array.isArray(d.players)&&d.players.length===DEFAULTS.players.length ? d.players : DEFAULTS.players;
+  S = { players:[...players], startDate:d.startDate||DEFAULTS.startDate, offDays:Array.isArray(d.offDays)?[...d.offDays]:[] };
+  P = j.picks || {};
+  if(!ready){ ready=true; selDay=Math.min(Math.max(todayIdx(),0),DAYS-1); renderAll(true); }
+  else renderAll(false);
+}
+let inflight=false;
+async function refresh(full){
+  if(inflight) return; inflight=true;
+  try{
+    const j = await api("GET", "/api/state" + (!full && version!==null ? `?since=${version}` : ""));
+    const wasOffline=offline; offline=false;
+    if(j.unchanged){ if(wasOffline) renderAll(false); return; }
+    applyState(j);
+  } catch(e){ if(!offline){ offline=true; renderAll(false); } }
+  finally{ inflight=false; }
+}
+// Minimal store interface the UI writes through.
+db = {
+  doc(path){
+    const [col,id] = path.split("/");
+    return {
+      async set(data){
+        if(col==="league"){ const j=await api("PUT","/api/settings",data); S={...S,...j.settings}; }
+        else { const j=await api("PUT","/api/picks/"+id,data); P={...P,[id]:j.pick}; }
+        renderAll(false); refresh(true);
+      },
+      async delete(){
+        await api("DELETE","/api/picks/"+id);
+        const n={...P}; delete n[id]; P=n; renderAll(false); refresh(true);
+      }
+    };
+  }
+};
+let timer=null;
+function schedule(){ clearTimeout(timer); timer=setTimeout(async()=>{ await refresh(false); schedule(); }, document.hidden ? 20000 : 3000); }
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden){ refresh(false); } schedule(); });
+addEventListener("focus",()=>refresh(false));
+addEventListener("online",()=>refresh(true));
+// Roll the "today" marker over at midnight without a reload.
+let lastToday=todayIdx(); setInterval(()=>{ const t=todayIdx(); if(t!==lastToday){ lastToday=t; renderAll(false); } }, 60000);
+refresh(true).then(schedule);
+</script>
+</body>
+</html>
