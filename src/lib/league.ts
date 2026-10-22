@@ -1,5 +1,5 @@
 import { espnDate, getSlate, hasStarted, Game, num } from './espn'
-import { claimSettle, DAYS, getAllPicks, getPick, getSettings, Pick, PICK_ID, PLAYER_COUNT, putPicks } from './store'
+import { addCheckedDay, claimSettle, DAYS, getAllPicks, getCheckedDays, getPick, getSettings, Pick, PICK_ID, PLAYER_COUNT, putPicks, putSettings, Settings } from './store'
 
 /** Day number (0-based) for today's date in US Eastern time. */
 export function dayIndexET(startDate: string): number {
@@ -34,6 +34,8 @@ export async function buildEventPick(id: string, body: any): Promise<Pick> {
   const line = backfill ? num(body.backfillLine) : type === 'total' ? g.total : side === 'home' ? g.spreadHome : g.spreadAway
   if (line === null) throw new HttpError(409, `No ${type === 'total' ? 'total' : 'spread'} posted for this game yet`)
 
+  await assertNotTaken(day, slot, { eventId: g.id, league: g.league, away: g.away.name, home: g.home.name, type, side }, settings)
+
   return {
     day, slot, type, side, line,
     away: g.away.name, home: g.home.name,
@@ -46,6 +48,28 @@ export async function buildEventPick(id: string, body: any): Promise<Pick> {
   }
 }
 
+const gameKey = (p: { away?: string; home?: string }) => `${(p.away || '').trim().toLowerCase()}@${(p.home || '').trim().toLowerCase()}`
+
+/** No two players may hold the exact same bet (same game, same side or same over/under) on a day. */
+export async function assertNotTaken(
+  day: number, slot: number,
+  bet: { eventId?: string | null; league?: string; away: string; home: string; type: string; side: string },
+  settings?: Settings,
+) {
+  const picks = await getAllPicks()
+  for (const p of Object.values(picks)) {
+    if (p.day !== day || p.slot === slot || p.type !== bet.type || p.side !== bet.side) continue
+    const sameGame = bet.eventId && p.eventId
+      ? p.eventId === bet.eventId && (!p.league || !bet.league || p.league === bet.league)
+      : gameKey(p) === gameKey(bet)
+    if (sameGame) {
+      const s = settings ?? (await getSettings())
+      const who = s.players[p.slot] || 'Someone'
+      throw new HttpError(409, `${who} already took ${bet.type === 'total' ? (bet.side === 'over' ? 'the over' : 'the under') : 'that side'}. Pick something else.`)
+    }
+  }
+}
+
 /** Event picks can't be changed or deleted once their game has started. */
 export async function assertNotLocked(id: string) {
   const existing = await getPick(id)
@@ -55,14 +79,38 @@ export async function assertNotLocked(id: string) {
 }
 
 /**
+ * Past days with no college or NFL games become days off automatically, so nobody takes a
+ * missed-pick loss for them. Each past day is checked once; a fetch failure just retries later.
+ */
+async function markEmptyDays(settings: Settings, today: number): Promise<Settings> {
+  const checked = await getCheckedDays()
+  const off = new Set(settings.offDays)
+  const toCheck: number[] = []
+  for (let d = 0; d < Math.min(today, DAYS); d++) if (!off.has(d) && !checked.has(d)) toCheck.push(d)
+  if (!toCheck.length) return settings
+  const newlyOff: number[] = []
+  for (const d of toCheck.slice(0, 6)) {
+    const games = await getSlate(espnDate(settings.startDate, d), true, true)
+    if (games.length === 0) newlyOff.push(d)
+    await addCheckedDay(d)
+  }
+  if (!newlyOff.length) return settings
+  const next = { ...settings, offDays: Array.from(off).concat(newlyOff).sort((a, b) => a - b) }
+  await putSettings(next)
+  return next
+}
+
+/**
  * Pull live/final scores for every unfinished slate pick and write them back.
  * Throttled so it runs at most every `everySec` seconds no matter how many phones poll.
  */
 export async function settle(opts: { everySec?: number; force?: boolean } = {}): Promise<{ ran: boolean; updated: number }> {
   if (!opts.force && !(await claimSettle(opts.everySec ?? 40))) return { ran: false, updated: 0 }
-  const [settings, picks] = await Promise.all([getSettings(), getAllPicks()])
-  const now = Date.now()
+  let settings = await getSettings()
   const today = dayIndexET(settings.startDate)
+  try { settings = await markEmptyDays(settings, today) } catch (e) { console.error('off-day check failed', e) }
+  const picks = await getAllPicks()
+  const now = Date.now()
   // Unfinished slate picks from today or earlier (late games can finish after midnight ET)
   const pending = Object.entries(picks).filter(([, p]) =>
     p.eventId && (p.awayScore === null || p.homeScore === null) && p.day <= today)

@@ -118,6 +118,42 @@ export async function claimSettle(sec: number): Promise<boolean> {
   return (await kv.set('grind:settle-lock', Date.now(), { nx: true, ex: sec })) === 'OK'
 }
 
+/** Days (0-based) already confirmed to have had games, so they aren't re-checked. */
+const memChecked = new Set<number>()
+export async function getCheckedDays(): Promise<Set<number>> {
+  if (!useKV()) return memChecked
+  const arr = (await kv.smembers('grind:checked-days')) as (string | number)[]
+  return new Set(arr.map(Number))
+}
+export async function addCheckedDay(day: number) {
+  if (!useKV()) { memChecked.add(day); return }
+  await kv.sadd('grind:checked-days', day)
+}
+
+/**
+ * Serialize pick writes for one day so two people can't grab the same side at the same instant.
+ * Short-lived lock (SET NX with expiry); waits up to ~3 s for it.
+ */
+const memLocks = new Map<number, Promise<unknown>>()
+export async function withDayLock<T>(day: number, fn: () => Promise<T>): Promise<T> {
+  if (!useKV()) {
+    const prev = memLocks.get(day) ?? Promise.resolve()
+    const run = prev.catch(() => {}).then(fn)
+    memLocks.set(day, run)
+    return run
+  }
+  const key = `grind:daylock:${day}`
+  const token = `${Date.now()}-${Math.random()}`
+  for (let i = 0; i < 20; i++) {
+    if ((await kv.set(key, token, { nx: true, ex: 5 })) === 'OK') {
+      try { return await fn() }
+      finally { if ((await kv.get(key)) === token) await kv.del(key) }
+    }
+    await new Promise((r) => setTimeout(r, 150))
+  }
+  throw new Error('Busy, try again')
+}
+
 export async function putPick(id: string, pick: Pick): Promise<number> {
   if (!useKV()) mem.picks.set(id, pick)
   else await kv.hset(K_PICKS, { [id]: pick })

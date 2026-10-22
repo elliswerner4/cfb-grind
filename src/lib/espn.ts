@@ -142,9 +142,9 @@ async function fetchLeague(league: League, date: string): Promise<Game[]> {
 }
 
 /** College + NFL slate for one ET date, cached ~45s in KV so many phones don't hammer ESPN. */
-export async function getSlate(date: string, fresh = false): Promise<Game[]> {
+export async function getSlate(date: string, fresh = false, strict = false): Promise<Game[]> {
   const key = `slate2:${date}`
-  if (!fresh) {
+  if (!fresh && !strict) {
     if (useKV()) {
       const hit = await kv.get<Game[]>(key)
       if (hit) return hit
@@ -155,6 +155,8 @@ export async function getSlate(date: string, fresh = false): Promise<Game[]> {
   }
   const results = await Promise.allSettled([fetchLeague('cfb', date), fetchLeague('nfl', date)])
   if (results.every((r) => r.status === 'rejected')) throw (results[0] as PromiseRejectedResult).reason
+  // strict: both leagues must answer (used to decide a day truly had no games)
+  if (strict) { const bad = results.find((r) => r.status === 'rejected'); if (bad) throw (bad as PromiseRejectedResult).reason }
   const games = results.flatMap((r) => (r.status === 'fulfilled' ? r.value : []))
     .sort((x, y) => x.start.localeCompare(y.start) || x.home.name.localeCompare(y.home.name))
   if (useKV()) await kv.set(key, games, { ex: TTL_SEC })

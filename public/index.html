@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
 <style>
-/* Layout: scoreboard band with season progress → your pick today → standings with form + streaks → units race → 44-day strip → selected day → trophy case. */
+/* Layout: scoreboard band with season progress → your pick today → standings with form + streaks → net-wins race → 44-day strip → selected day → trophy case. */
 :root{
   --bg:#EDF0EA; --surface:#FFFFFF; --sunk:#E2E7DF; --line:#CAD2C6;
   --ink:#13201A; --muted:#58675E;
@@ -129,7 +129,7 @@ tr.lead td.rank{color:var(--accent)}
 .you{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;background:var(--accent-soft);color:var(--ink);border-radius:4px;padding:2px 5px;font-weight:600}
 .rec{font-family:var(--display);font-weight:800;font-size:22px;line-height:1}
 .rec+small{display:block;font-size:12px;color:var(--muted);font-family:var(--mono)}
-.units{font-weight:600}
+.net{font-weight:600}
 .pos{color:var(--win)} .neg{color:var(--loss)}
 
 /* ---------- race chart ---------- */
@@ -270,6 +270,9 @@ img{max-width:100%}
 .bet small{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
 .bet b{font-family:var(--display);font-weight:900;font-size:24px;text-transform:uppercase;line-height:1;overflow-wrap:anywhere}
 .bet:disabled{opacity:.4;cursor:not-allowed}
+.bet.taken{opacity:1;background:var(--sunk);border-style:dashed}
+.bet.taken b{text-decoration:line-through;text-decoration-thickness:2px;color:var(--muted)}
+.bet.taken small{color:var(--loss)}
 .bet[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);box-shadow:0 0 0 2px var(--accent-soft)}
 .linkish{border:0;background:none;padding:2px 0;color:var(--muted);font-size:13.5px;text-decoration:underline;text-underline-offset:3px;align-self:flex-start}
 .locked{background:var(--sunk);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:6px}
@@ -314,15 +317,15 @@ img{max-width:100%}
   <section id="hero" hidden></section>
 
   <section>
-    <div class="sec-h"><h2>Standings</h2><small>Units = 1 unit risked per pick at −110</small></div>
+    <div class="sec-h"><h2>Standings</h2><small>No pick by midnight counts as a loss</small></div>
     <div class="tbl-wrap"><table>
-      <thead><tr><th></th><th>Player</th><th>Record</th><th class="r">Units</th><th>Last 5</th><th>Streak</th></tr></thead>
+      <thead><tr><th></th><th>Player</th><th>Record</th><th class="r">Net</th><th>Last 5</th><th>Streak</th></tr></thead>
       <tbody id="standings"></tbody>
     </table></div>
   </section>
 
   <section>
-    <div class="sec-h"><h2>The race</h2><small>Running units, day by day</small></div>
+    <div class="sec-h"><h2>The race</h2><small>Wins minus losses, day by day</small></div>
     <div class="chart-card" id="race"></div>
   </section>
 
@@ -428,7 +431,6 @@ img{max-width:100%}
 const DAYS = 44;
 const DEFAULTS = { players:["Ellis","Frankie","Blake","Carter"], startDate:"2026-10-17", offDays:[] };
 const TEAMS = "Air Force,Akron,Alabama,App State,Arizona,Arizona State,Arkansas,Arkansas State,Army,Auburn,Ball State,Baylor,Boise State,Boston College,Bowling Green,Buffalo,BYU,California,Central Michigan,Charlotte,Cincinnati,Clemson,Coastal Carolina,Colorado,Colorado State,Delaware,Duke,East Carolina,Eastern Michigan,FIU,Florida,Florida Atlantic,Florida State,Fresno State,Georgia,Georgia Southern,Georgia State,Georgia Tech,Hawaii,Houston,Illinois,Indiana,Iowa,Iowa State,Jacksonville State,James Madison,Kansas,Kansas State,Kennesaw State,Kent State,Kentucky,Liberty,Louisiana,Louisiana Tech,Louisville,LSU,Marshall,Maryland,Memphis,Miami (FL),Miami (OH),Michigan,Michigan State,Middle Tennessee,Minnesota,Mississippi State,Missouri,Missouri State,Navy,NC State,Nebraska,Nevada,New Mexico,New Mexico State,North Carolina,North Texas,Northern Illinois,Northwestern,Notre Dame,Ohio,Ohio State,Oklahoma,Oklahoma State,Old Dominion,Ole Miss,Oregon,Oregon State,Penn State,Pittsburgh,Purdue,Rice,Rutgers,Sacramento State,Sam Houston,San Diego State,San Jose State,SMU,South Alabama,South Carolina,South Florida,Southern Miss,Stanford,Syracuse,TCU,Temple,Tennessee,Texas,Texas A&M,Texas State,Texas Tech,Toledo,Troy,Tulane,Tulsa,UAB,UCF,UCLA,UConn,ULM,UMass,UNLV,USC,Utah,Utah State,UTEP,UTSA,Vanderbilt,Virginia,Virginia Tech,Wake Forest,Washington,Washington State,West Virginia,Western Kentucky,Western Michigan,Wisconsin,Wyoming".split(",");
-const WIN_UNITS = 100/110;
 
 let S = structuredClone(DEFAULTS), P = {};
 let db = null, canWrite = true, ready = false, offline = false, version = null;
@@ -477,24 +479,31 @@ const result = p => p ? (p.manual || grade(p)) : null;
 const gameKey = p => `${(p.away||"").trim().toLowerCase()}@${(p.home||"").trim().toLowerCase()}`;
 
 /* ---------- derived stats ---------- */
+// A past day (not a day off) with no pick is an automatic loss.
+const isMissed = (d,slot) => !getPick(d,slot) && !isOff(d) && d < todayIdx();
+const dayResult = (d,slot) => { const p=getPick(d,slot); return p ? result(p) : isMissed(d,slot) ? "L" : null; };
 function runs(seq, ch){ let best=0,cur=0; for(const r of seq){ if(r===ch){cur++; best=Math.max(best,cur);} else if(r!=="P") cur=0; } return best; }
 function playerStats(slot){
   const t=todayIdx();
-  const list=[];
-  for(let d=0; d<DAYS; d++){ const p=getPick(d,slot); if(p) list.push({d,p,r:result(p)}); }
-  const graded=list.filter(x=>x.r);
+  const list=[], entries=[];
+  for(let d=0; d<DAYS; d++){
+    const p=getPick(d,slot);
+    if(p){ list.push({d,p,r:result(p)}); entries.push({d,p,r:result(p)}); }
+    else if(isMissed(d,slot)) entries.push({d,p:null,r:"L",missed:true});
+  }
+  const graded=entries.filter(x=>x.r);
   const seq=graded.map(x=>x.r);
   let w=0,l=0,pu=0; seq.forEach(r=>{ if(r==="W")w++; else if(r==="L")l++; else pu++; });
   const wl=seq.filter(r=>r!=="P");
   let streakType=null, streakLen=0;
   if(wl.length){ streakType=wl[wl.length-1]; for(let i=wl.length-1;i>=0&&wl[i]===streakType;i--) streakLen++; }
-  const rec = f => { let a=0,b=0; graded.filter(x=>f(x.p)).forEach(x=>{ if(x.r==="W")a++; else if(x.r==="L")b++; }); return {w:a,l:b}; };
+  const rec = f => { let a=0,b=0; list.filter(x=>x.r&&f(x.p)).forEach(x=>{ if(x.r==="W")a++; else if(x.r==="L")b++; }); return {w:a,l:b}; };
   let due=0; for(let d=0; d<=Math.min(t,DAYS-1); d++) if(!isOff(d)) due++;
   const series=[]; let cum=0;
-  for(let d=0; d<=Math.min(t,DAYS-1); d++){ const p=getPick(d,slot), r=result(p); if(r==="W") cum+=WIN_UNITS; else if(r==="L") cum-=1; series.push(cum); }
+  for(let d=0; d<=Math.min(t,DAYS-1); d++){ const r=dayResult(d,slot); if(r==="W") cum+=1; else if(r==="L") cum-=1; series.push(cum); }
   return {
-    slot, name:S.players[slot], w,l,pu, made:list.length, due,
-    pct:(w+l)?w/(w+l):null, units:w*WIN_UNITS-l,
+    slot, name:S.players[slot], w,l,pu, made:list.length, due, missed:entries.filter(x=>x.missed).length,
+    pct:(w+l)?w/(w+l):null, net:w-l,
     streakType, streakLen, longestW:runs(seq,"W"), longestL:runs(seq,"L"),
     form:seq.slice(-5),
     spread:rec(p=>p.type==="spread"), total:rec(p=>p.type==="total"),
@@ -505,7 +514,7 @@ function playerStats(slot){
     series
   };
 }
-function dayResults(d){ return S.players.map((_,s)=>result(getPick(d,s))); }
+function dayResults(d){ return S.players.map((_,s)=>dayResult(d,s)); }
 const isPerfect = d => { const r=dayResults(d); return r.every(x=>x==="W"); };
 
 
@@ -570,7 +579,7 @@ function renderHero(){
   const roll = `<div class="who-in">${S.players.map((_,s)=>avatar(s, getPick(t,s)?"":"ghosted")).join("")}<span>${off?"No-games day":inSlots.length===S.players.length?"Everyone's in":`${inSlots.length} of ${S.players.length} in · waiting on ${waiting.map(s=>esc(S.players[s])).join(", ")}`}</span></div>`;
   let k=`Day ${t+1} · ${esc(fmtLong(dayDate(t)))}`, big, sub, btn="", need=false;
   if(off){ big="Day off"; sub="Marked as a no-games day. Nothing to pick."; }
-  else if(!p){ need=true; big="Your pick's not in"; sub="Pick from today's slate. Lines fill in live and lock at kickoff."; btn=`<button class="btn gold" data-edit="${slot}" data-day="${t}" ${canWrite&&db?"":"disabled"}>Make today's pick</button>`; }
+  else if(!p){ need=true; big="Your pick's not in"; sub="Pick from today's slate before the games kick off. No pick by midnight counts as a loss."; btn=`<button class="btn gold" data-edit="${slot}" data-day="${t}" ${canWrite&&db?"":"disabled"}>Make today's pick</button>`; }
   else if(!r && p.eventId){
     big=esc(pickLabel(p));
     const ls=liveState(p);
@@ -592,16 +601,16 @@ function streakChip(s){
   return `<span class="chip ${s.streakType}">${s.streakType}${s.streakLen}</span>`;
 }
 function renderStandings(){
-  const rows=[...ST].sort((a,b)=> b.units-a.units || (b.w-b.l)-(a.w-a.l) || b.w-a.w || a.slot-b.slot);
+  const rows=[...ST].sort((a,b)=> b.net-a.net || (b.pct??-1)-(a.pct??-1) || b.w-a.w || a.slot-b.slot);
   const anyGraded = rows.some(r=>r.w+r.l+r.pu>0);
   $("standings").innerHTML = rows.map((r,i)=>{
     const flame = r.streakType==="W"&&r.streakLen>=3 ? `<span style="color:var(--fire)" title="On a heater">${icon("fire")}</span>` : r.streakType==="L"&&r.streakLen>=3 ? `<span style="color:var(--ice)" title="Ice cold">${icon("ice")}</span>` : "";
     const form = Array.from({length:5},(_,k)=>{ const x=r.form[r.form.length-5+k]; return x?`<i class="${x}">${x}</i>`:`<i class="e"></i>`; }).join("");
     return `<tr class="${anyGraded&&i===0?"lead":""}">
       <td class="rank">${i+1}</td>
-      <td><div class="pl">${avatar(r.slot)}<div><div class="nm">${esc(r.name)}${flame}${String(r.slot)===me?`<span class="you">You</span>`:""}</div><div class="sm">${r.made}/${r.due} picks in</div></div></div></td>
+      <td><div class="pl">${avatar(r.slot)}<div><div class="nm">${esc(r.name)}${flame}${String(r.slot)===me?`<span class="you">You</span>`:""}</div><div class="sm">${r.made}/${r.due} picks in${r.missed?` · <span class="neg">${r.missed} missed</span>`:""}</div></div></div></td>
       <td><span class="rec num">${r.w}-${r.l}${r.pu?`-${r.pu}`:""}</span><small>${r.pct===null?"—":(r.pct*100).toFixed(1)+"%"}</small></td>
-      <td class="r num units ${r.units>0.001?"pos":r.units<-0.001?"neg":""}">${r.units>0.001?"+":""}${r.units.toFixed(2)}u</td>
+      <td class="r num net ${r.net>0?"pos":r.net<0?"neg":""}">${r.net>0?"+":""}${r.net}</td>
       <td><span class="form">${form}</span></td>
       <td>${streakChip(r)}</td>
     </tr>`;
@@ -618,7 +627,7 @@ function renderRace(){
   const pl=40, pr=14, pt=12, pb=26;
   const all=ST.flatMap(s=>s.series).concat([0]);
   let lo=Math.min(...all), hi=Math.max(...all); if(hi-lo<2){ hi+=1; lo-=1; }
-  const step=niceStep((hi-lo)/4); lo=Math.floor(lo/step)*step; hi=Math.ceil(hi/step)*step;
+  const step=Math.max(1, niceStep((hi-lo)/4)); lo=Math.floor(lo/step)*step; hi=Math.ceil(hi/step)*step;
   const x=i=> pl + (n<=1?0:(i/(n-1))*(W-pl-pr));
   const y=v=> pt + (hi-v)/(hi-lo)*(H-pt-pb);
   let g="";
@@ -632,8 +641,8 @@ function renderRace(){
     const mine=String(s.slot)===me;
     return `<path d="${d}" fill="none" stroke="var(--p${s.slot})" stroke-width="${mine?3.5:2.25}" stroke-linejoin="round" stroke-linecap="round" opacity="${me===null||mine?1:.8}"/><circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="${mine?5:4}" fill="var(--p${s.slot})" stroke="var(--surface)" stroke-width="2"/>`;
   }).join("");
-  const legend=[...ST].sort((a,b)=>b.units-a.units).map(s=>`<span style="--c:var(--p${s.slot})"><i></i>${esc(s.name)} <b class="num ${s.units>0.001?"pos":s.units<-0.001?"neg":""}">${s.units>0.001?"+":""}${s.units.toFixed(2)}</b></span>`).join("");
-  el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Running units by day for each player">${g}${lines}</svg><div class="legend">${legend}</div>`;
+  const legend=[...ST].sort((a,b)=>b.net-a.net).map(s=>`<span style="--c:var(--p${s.slot})"><i></i>${esc(s.name)} <b class="num ${s.net>0?"pos":s.net<0?"neg":""}">${s.net>0?"+":""}${s.net}</b></span>`).join("");
+  el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Wins minus losses by day for each player">${g}${lines}</svg><div class="legend">${legend}</div>`;
 }
 
 function renderStrip(scroll){
@@ -641,7 +650,7 @@ function renderStrip(scroll){
   $("strip").innerHTML = Array.from({length:DAYS},(_,d)=>{
     const dt=dayDate(d);
     const dots = isOff(d) ? `<span class="off">NO GAMES</span>` :
-      `<span class="dots">${S.players.map((_,s)=>{ const p=getPick(d,s); return `<span class="dot ${p?(result(p)||"pend"):""}"></span>`; }).join("")}</span>`;
+      `<span class="dots">${S.players.map((_,s)=>{ const p=getPick(d,s), r=dayResult(d,s); return `<span class="dot ${r||(p?"pend":"")}"></span>`; }).join("")}</span>`;
     return `<button class="dbtn ${d===t?"today":""} ${d===selDay?"sel":""} ${isPerfect(d)?"perfect":""}" data-day="${d}" aria-label="Day ${d+1}, ${esc(fmtLong(dt))}">
       <span class="dw">${fmtW(dt)}</span><span class="dn">${d+1}</span><span class="dw">${fmtMD(dt)}</span>${dots}</button>`;
   }).join("");
@@ -673,14 +682,14 @@ function renderDay(){
           : `<div class="game">${esc(p.away)} @ ${esc(p.home)} · ${p.type==="total"?"total":"spread"} · entered by hand</div>`;
         inner=`<div class="pick">${esc(pickLabel(p))}</div>${gl}${sc}${tags}`;
       } else {
-        chip = d<t ? `<span class="chip miss">Missed</span>` : `<span class="chip none">No pick</span>`;
-        inner = `<div class="empty">${d<t?"Nothing entered for this day.":d===t?"On the clock.":"Picks open any time."}</div>`;
+        chip = d<t ? `<span class="chip L">Missed · Loss</span>` : `<span class="chip none">No pick</span>`;
+        inner = `<div class="empty">${d<t?"No pick was made, so it counts as a loss.":d===t?"On the clock. No pick by midnight is a loss.":"Picks open any time."}</div>`;
       }
       const act = p
         ? (kicked(p) ? `<button class="btn small" data-edit="${s}">View</button>`
            : `<button class="btn small" data-edit="${s}" ${allow?"":"disabled"}>${p.eventId?"Change pick":r?"Edit":"Enter final"}</button>`)
         : `<button class="btn small ${String(s)===me?"gold":"primary"}" data-edit="${s}" ${allow?"":"disabled"}>Make pick</button>`;
-      return `<article class="card ${String(s)===me?"me":""} ${r||""}"><div class="top"><span class="who">${avatar(s)}<span>${esc(name)}</span></span>${chip}</div>${inner}<div class="acts">${act}</div></article>`;
+      return `<article class="card ${String(s)===me?"me":""} ${r||(isMissed(d,s)?"L":"")}"><div class="top"><span class="who">${avatar(s)}<span>${esc(name)}</span></span>${chip}</div>${inner}<div class="acts">${act}</div></article>`;
     }).join("")}</div>`;
   }
   const perfect = !off && isPerfect(d) ? ` · <b style="color:var(--accent)">Perfect day, ${S.players.length} for ${S.players.length}</b>` : "";
@@ -793,7 +802,15 @@ function renderBet(){
     {type:"total",side:"over",k:"Total",lbl:`Over ${g.total??""}`,ok:g.total!==null},
     {type:"total",side:"under",k:"Total",lbl:`Under ${g.total??""}`,ok:g.total!==null},
   ];
-  $("bets").innerHTML=opts.map(o=>`<button type="button" class="bet" data-type="${o.type}" data-side="${o.side}" aria-pressed="${form.bet&&form.bet.type===o.type&&form.bet.side===o.side}" ${o.ok?"":"disabled"}><small>${o.ok?o.k:"No line yet"}</small><b>${esc(o.lbl)}</b></button>`).join("");
+  const mySlot = form.editing ? form.slot : Number($("pfPlayer").value);
+  const takenBy = o => S.players.findIndex((_,s2)=>{ if(s2===mySlot) return false; const q=getPick(form.day,s2);
+    return q && q.eventId===g.id && (!q.league||q.league===g.league) && q.type===o.type && q.side===o.side; });
+  opts.forEach(o=>{ o.by=takenBy(o); if(o.by>=0 && form.bet && form.bet.type===o.type && form.bet.side===o.side) form.bet=null; });
+  $("bets").innerHTML=opts.map(o=>{
+    const taken=o.by>=0;
+    const tag = taken ? `Taken by ${esc(S.players[o.by])}` : o.ok ? o.k : "No line yet";
+    return `<button type="button" class="bet ${taken?"taken":""}" data-type="${o.type}" data-side="${o.side}" aria-pressed="${!taken&&form.bet&&form.bet.type===o.type&&form.bet.side===o.side}" ${o.ok&&!taken?"":"disabled"}><small>${tag}</small><b>${esc(o.lbl)}</b></button>`;
+  }).join("");
   $("pfSave").disabled=!form.bet;
 }
 
@@ -911,6 +928,7 @@ $("slateList").addEventListener("click",e=>{
   form.game=g; showPane("bet");
 });
 $("slateQ").addEventListener("input",renderSlate);
+$("pfPlayer").addEventListener("change",()=>{ if(form?.pane==="bet") renderBet(); });
 $("slateLeague").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b||!form) return; form.league=b.dataset.v; renderSlate(); });
 $("bets").addEventListener("click",e=>{ const b=e.target.closest(".bet"); if(!b||b.disabled) return; form.bet={type:b.dataset.type, side:b.dataset.side}; renderBet(); });
 $("toSlate").addEventListener("click",()=>{ showPane("slate"); loadSlate(form.day); });
@@ -1004,6 +1022,7 @@ function applyState(j){
   }
   if(!ready){ ready=true; selDay=Math.min(Math.max(todayIdx(),0),DAYS-1); renderAll(true); }
   else renderAll(false);
+  if(form?.pane==="bet") renderBet();
 }
 let inflight=false;
 async function refresh(full){
